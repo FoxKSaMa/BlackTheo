@@ -1,0 +1,5 @@
+* text=auto
+*.cso binary
+*.png binary
+*.pdf binary
+*.7z binary

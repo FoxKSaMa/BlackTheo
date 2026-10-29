@@ -1,0 +1,18 @@
+# Build output
+**/bin/
+**/obj/
+.vs/
+*.user
+
+# Local release artifact
+dist/
+
+# Personal screenshots / feedback
+reference/
+docs.7z
+
+# Local tooling and scratch files
+_tools/
+_*.txt
+_*.png
+*.zip
