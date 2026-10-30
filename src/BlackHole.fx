@@ -1,45 +1,45 @@
-// BlackTheo - a small, physically-shaped black hole for Celeste.
+// BlackTheo —— 为 Celeste 制作的小型、具有物理形态的黑洞。
 //
-// The accretion disk is NOT a screen-space ellipse. It is a thin disk in the
-// y=0 plane; null geodesics are integrated around a Schwarzschild-like mass
-// and their crossings of the disk plane are recorded. This is what produces
-// the characteristic Interstellar/Gargantua shape:
-//   * the near side crosses in front of the shadow as a thin band,
-//   * the far side is bent over and under the shadow into bright arcs,
-//   * a thin photon ring hugs the shadow.
+// 吸积盘不是屏幕空间的贴图椭圆，而是位于 y=0 平面的薄盘；
+// 我们围绕一个类史瓦西质量积分零测地线，并记录光线与盘面的交点。
+// 由此得到类似《星际穿越》/卡冈图雅的形态：
+//   * 近侧盘面从阴影前方穿过，形成一条细带；
+//   * 远侧盘面被弯折到阴影的上下方，形成明亮弧线；
+//   * 阴影边缘贴着一圈很细的光子环。
 //
-// The same traced rays are used for the screen-space lens: an escaped ray is
-// sampled from the gameplay target at the direction it actually left the
-// scene, with a short falloff so nearby objects remain recognizable.
+// 同一批积分光线也用于屏幕空间透镜：逃逸光线会按照它实际离开
+// 场景的方向，去采样已经合成好的游戏画面，并用一段较短的衰减
+// 让附近的物体仍然可以辨认。
 //
-// References:
-//   - sayed1145/glsl-black-hole (MIT): disk radiance / domain-warped filaments.
-//   - Gitee "black hole recycling station": deflection-based screen lens and
-//     compact presentation.
-//   - Luminet (1979), James et al. (2015): thin-disk lensing geometry.
+// 参考：
+//   - sayed1145/glsl-black-hole（MIT）：盘面亮度与域扭曲丝状纹理。
+//   - Gitee“黑洞回收站”：基于偏折的屏幕透镜与紧凑构图。
+//   - Luminet (1979)、James et al. (2015)：薄盘透镜几何。
 
 sampler ScreenSampler : register(s0);
 
 float4x4 MatrixTransform;
 float2 ScreenSize;
-float4 Hole;         // xy = centre in gameplay pixels, z = shadow radius, w = lens radius (px)
-float4 HoleParams;   // x = disk brightness, y = lens displacement scale, z = lens cap (px), w = time
+float4 Hole;         // xy = 游戏像素中的中心，z = 阴影半径，w = 透镜半径（px）
+float4 HoleParams;   // Theo：x = 盘亮度，y = 透镜位移缩放，z = 偏移上限（px），w = 时间
+                     // 玛德琳：y = 强度，z = 黑核半径，w = 时间
 float DopplerEnabled;
 float SpecksEnabled;
 float NoiseSeed;
 float LensFalloff;
 float LensEdge;
 float DiskAlpha;
-float LensOnly;      // 1 = Madeline lens pass (no disk/shadow/specks)
+float LensOnly;      // 1 = 玛德琳专用透镜分支（不画盘/阴影/星尘）
 float4 DiskInnerColor;
 float4 DiskMidColor;
 float4 DiskOuterColor;
 float4 PhotonColor;
-float4 RingColor;    // outer scatter / halo tint
+float4 RingColor;    // 外围散射 / 光晕颜色
 
 #define TAU 6.28318530718
 #define PI 3.14159265
 
+// 二维哈希：为噪声、星尘和抖动提供稳定的伪随机值。
 float hash21(float2 p)
 {
     p = fmod(p, 128.0);
@@ -48,6 +48,7 @@ float hash21(float2 p)
     return frac((q.x + q.y) * q.z);
 }
 
+// 带角向周期的二维值噪声；period 让盘面在 -pi/pi 接缝处保持连续。
 float noiseP(float2 p, float period)
 {
     p = fmod(p, 128.0);
@@ -63,6 +64,7 @@ float noiseP(float2 p, float period)
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
 }
 
+// 三层分形噪声，用来生成盘面的丝状细节。
 float fbmP(float2 p, float period)
 {
     float sum = 0.0;
@@ -83,10 +85,10 @@ float3 diskShade(float radius, float angle, float time)
     float3 c = lerp(DiskInnerColor.rgb, DiskMidColor.rgb, smoothstep(0.02, 0.45, t));
     c = lerp(c, DiskOuterColor.rgb, smoothstep(0.48, 1.0, t));
 
-    // Seamless domain-warped filaments. The angular coordinate has an
-    // integer period, so the pi/-pi seam is mathematically closed.
-    // Negative flow reverses the disk animation: the left side (which the
-    // Doppler phase keeps bright) is then the approaching side.
+    // 无缝的域扭曲丝状纹理。角坐标使用整数周期，
+    // 因此 -pi/pi 接缝在数学上闭合。
+    // 负向流动会反转盘面动画：多普勒相位下更亮的左侧
+    // 就成为朝向观察者的一侧。
     float a = angle / TAU + 0.5;
     float flow = -time * 0.35;
     float warp = fbmP(float2(radius * 0.75 + 3.1, a * 8.0 - flow * 1.7), 8.0);
@@ -96,15 +98,15 @@ float3 diskShade(float radius, float angle, float time)
     float density = saturate(0.22 + 1.35 * filament);
     density *= 0.62 + 0.85 * fine;
 
-    // Balanced Doppler shading: brighter approaching side, dimmer receding
-    // side, with the average kept at 1.0 so the disk does not get darker.
+    // 平衡的多普勒明暗：朝向观察者的一侧更亮，远离的一侧更暗，
+    // 平均值保持 1.0，避免整张盘变暗。
     float doppler = lerp(1.0, 1.0 + 0.30 * cos(angle - 0.55), DopplerEnabled);
     return c * density * doppler;
 }
 
-// A few drifting colored pixels inside the shadow, visible only where the
-// accretion disk does not cover them. Positions are deterministic per Theo
-// (NoiseSeed) but orbit slowly, so there is always a small, stable population.
+// 阴影内部零散漂浮的彩色像素；只在吸积盘没有覆盖的地方显示。
+// 位置由每个 Theo 的 NoiseSeed 确定，并缓慢绕转，
+// 因此始终有一小群稳定存在的星尘。
 float3 horizonSpecks(float2 pixel, float time, float shadowRadius, float3 ca, float3 cb, float3 cc)
 {
     float3 result = float3(0.0, 0.0, 0.0);
@@ -136,6 +138,8 @@ float3 horizonSpecks(float2 pixel, float time, float shadowRadius, float3 ca, fl
 
     return result;
 }
+
+// 类史瓦西零测地线加速度；h2 是角动量平方。
 float3 LensAccel(float3 p, float h2)
 {
     float r2 = dot(p, p);
@@ -153,8 +157,8 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
 
     float4 color = tex2D(ScreenSampler, uv);
 
-    // A lens-only pass around Madeline. This deliberately does not draw an
-    // event horizon or a disk; it only bends the already-composited screen.
+    // 玛德琳专用的纯透镜分支。这里刻意不画吸积盘和光子环，
+    // 只弯折已经合成好的屏幕；中心由单独的黑核遮住。
     if (LensOnly > 0.5)
     {
         float2 d = pixel - Hole.xy;
@@ -168,8 +172,7 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
             float2 dir = d / max(r, 0.0001);
             float strength = saturate(HoleParams.y);
 
-            // Radial-only lens: a gravitational lens is symmetric. The old
-            // tangential term made this look like a whirlpool.
+            // 纯径向透镜：引力透镜应保持对称；旧的切向项会让它像漩涡。
             float2 offset = -dir * (radius * 0.42 * strength) * falloff;
 
             float offsetMag = length(offset);
@@ -182,8 +185,8 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
                 ScreenSampler,
                 saturate((pixel + offset) / ScreenSize)).rgb;
 
-            // The radial warp folds over itself near the middle; the black
-            // core covers that hollow ring and scales with the lens level.
+            // 径向扭曲在中心附近会折叠；黑核负责遮住中间的空心环，
+            // 其半径随透镜档位缩放。
             float coreRadius = max(HoleParams.z, 0.0);
             color.rgb *= smoothstep(coreRadius - 0.75, coreRadius + 0.75, r);
         }
@@ -194,9 +197,8 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
 
     if (screenRadius < lensRadius)
     {
-        // Map the desired screen shadow radius to the critical impact
-        // parameter b_c = 2.598. The measured 9.6 px reference gives a
-        // stable FOV scale independent of the requested shadow size.
+        // 把期望的屏幕阴影半径映射到临界碰撞参数 b_c = 2.598。
+        // 以实测 9.6px 为参考，可得到与阴影大小无关的稳定 FOV 缩放。
         float fovScale = 9.6 / shadowRadius;
         float2 uvWin = (pixel - Hole.xy) / ScreenSize.y;
         uvWin.y = -uvWin.y;
@@ -208,7 +210,7 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
         float3 rt = normalize(cross(fw, float3(0.0, 1.0, 0.0)));
         float3 up = cross(rt, fw);
 
-        // Screen-space roll: the disk is no longer a flat horizontal bar.
+        // 屏幕空间 roll：让吸积盘不再是一条水平扁带。
         float roll = 0.32;
         float cr = cos(roll);
         float sr = sin(roll);
@@ -218,7 +220,7 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
 
         float3 pos = ro;
         float3 v = rd0;
-        // Jitter the starting point to break up step quantisation.
+        // 抖动积分起点，打散步长量化。
         pos += v * (hash21(pixel) * 0.11);
         float3 hv = cross(pos, v);
         float h2 = dot(hv, hv);
@@ -284,12 +286,12 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
             }
         }
 
-        // Thin photon ring and a small halo in the selected palette.
+        // 细光子环和调色板颜色的微弱光晕。
         float photon = 1.0 - smoothstep(0.18, 0.95, abs(screenRadius - (shadowRadius + 0.55)));
         float3 ring = PhotonColor.rgb * photon * 1.35;
 
-        // Screen-space lens: strong close to the photon sphere, subtle over a
-        // wider radius. Only the innermost pixels are heavily smeared.
+        // 屏幕空间透镜：靠近光子球时更强，在更大半径上逐渐减弱；
+        // 只有最内侧像素会被强烈涂抹。
         float3 background = float3(0.0, 0.0, 0.0);
         if (captured < 0.5)
         {
@@ -316,9 +318,8 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
 
         float shadow = 1.0 - smoothstep(shadowRadius - 0.75, shadowRadius + 0.75, screenRadius);
 
-        // Sparse colored pixels inhabit the empty black parts of the shadow.
-        // They are added before the disk so front-side disk material covers
-        // them naturally.
+        // 稀疏彩色像素填充阴影中的黑色区域。
+        // 它们先于盘面叠加，因此近侧盘面会自然遮住它们。
         float3 specks = float3(0.0, 0.0, 0.0);
         if (SpecksEnabled > 0.5 && shadow > 0.01)
         {
@@ -333,16 +334,16 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
         float diskLum = dot(diskCol, float3(0.299, 0.587, 0.114));
         float bgLum = dot(background, float3(0.299, 0.587, 0.114));
 
-        // A very small amount of coverage blending keeps the disk visible on
-        // bright maps, and makes it behave more like a material than a pure
-        // additive gel. The bright-background boost is intentionally modest.
+        // 少量覆盖混合让盘面在明亮地图上仍然可见，
+        // 也让它的行为更像材质而不是纯加法凝胶。
+        // 亮背景增强是有意保持克制的。
         float bright = saturate(bgLum);
         float coverage = saturate(diskLum * HoleParams.x * 1.55 * DiskAlpha * (1.0 + bright * 0.45));
         float dither = hash21(pixel + 13.7) - 0.5;
         coverage = saturate(coverage + dither * 0.04);
 
-        // Soft pixel-art quantisation: 10 levels, only partially applied so it
-        // breaks up the airbrushed fBm without hard banding.
+        // 柔和的像素风量化：10 级，只部分应用，
+        // 用来打散过于平滑的 fBm，同时避免硬色带。
         float3 diskTint = diskCol * HoleParams.x * DiskAlpha;
         float3 quant = floor(diskTint * 10.0 + 0.5) / 10.0;
         diskTint = lerp(diskTint, quant, 0.30);
