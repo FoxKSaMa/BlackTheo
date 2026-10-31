@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\BlackHole.cso" LogicalName="Celeste.Mod.BlackTheo.BlackHole.cso" />
+    <EmbeddedResource Include="Resources\MadelineLens.cso" LogicalName="Celeste.Mod.BlackTheo.MadelineLens.cso" />
   </ItemGroup>
 
   <ItemGroup>

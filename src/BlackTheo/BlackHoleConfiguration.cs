@@ -265,9 +265,5 @@ public sealed class BlackTheoSettings : EverestModuleSettings
         set => madelineLensLevel = Math.Clamp(value, 0, 10);
     }
 
-    [SettingName("blacktheo_hide_madeline_core")]
-    [SettingSubText("blacktheo_hide_madeline_core_help")]
-    public bool HideMadelineLensCore { get; set; } = false;
-
     private int madelineLensLevel = 2;
 }

@@ -21,13 +21,18 @@ if ([string]::IsNullOrWhiteSpace($CelestePath) -or -not (Test-Path (Join-Path $C
 }
 
 Write-Host "Using Celeste at $CelestePath"
-Write-Host 'Compiling HLSL effect...'
+Write-Host 'Compiling HLSL effects...'
 dotnet run --project (Join-Path $Root 'tools\EffectCompiler\EffectCompiler.csproj') -c Release -- `
     (Join-Path $Root 'src\BlackHole.fx') (Join-Path $Root 'src\BlackHole.cso')
-if ($LASTEXITCODE -ne 0) { throw 'Effect compilation failed.' }
+if ($LASTEXITCODE -ne 0) { throw 'Black hole effect compilation failed.' }
+
+dotnet run --project (Join-Path $Root 'tools\EffectCompiler\EffectCompiler.csproj') -c Release -- `
+    (Join-Path $Root 'src\MadelineLens.fx') (Join-Path $Root 'src\MadelineLens.cso')
+if ($LASTEXITCODE -ne 0) { throw 'Madeline lens effect compilation failed.' }
 
 New-Item -ItemType Directory -Force (Join-Path $Root 'src\BlackTheo\Resources') | Out-Null
 Copy-Item (Join-Path $Root 'src\BlackHole.cso') (Join-Path $Root 'src\BlackTheo\Resources\BlackHole.cso') -Force
+Copy-Item (Join-Path $Root 'src\MadelineLens.cso') (Join-Path $Root 'src\BlackTheo\Resources\MadelineLens.cso') -Force
 
 # The runtime shader is embedded in the DLL; no Effects folder is needed.
 Remove-Item (Join-Path $Dist 'Effects') -Recurse -Force -ErrorAction SilentlyContinue

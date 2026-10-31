@@ -8,8 +8,6 @@ blacktheo_specks=星尘
 blacktheo_madeline_lens=玛德琳黑洞模式
 blacktheo_madeline_level=玛德琳透镜强度
 blacktheo_madeline_speed_help=速度：透镜强度随玛德琳速度变化
-blacktheo_hide_madeline_core=不渲染玛德琳透镜黑核
-blacktheo_hide_madeline_core_help=不在玛德琳透镜中心绘制黑圈
 blacktheo_enabled=开关
 
 modoptions_blacktheo_lensstrength_off=关闭

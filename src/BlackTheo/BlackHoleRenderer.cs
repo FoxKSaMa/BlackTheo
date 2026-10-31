@@ -34,8 +34,10 @@ internal static class BlackHoleRenderer
     private static bool hasSmoothedMadelineLens;
 
     private static Effect? effect;
+    private static Effect? madelineLensEffect;
     private static RenderTarget2D? capture;
     private static bool effectFailed;
+    private static bool madelineLensFailed;
     private static bool renderFailed;
 
     public static bool IsOperational => !renderFailed && !effectFailed;
@@ -137,12 +139,7 @@ internal static class BlackHoleRenderer
 
         if (madelineLens != null)
         {
-            ApplyMadelineLens(
-                device,
-                sourceTarget,
-                madelineLens.Value,
-                time,
-                !settings.HideMadelineLensCore);
+            ApplyMadelineLens(device, sourceTarget, madelineLens.Value, time);
         }
     }
 
@@ -175,7 +172,6 @@ internal static class BlackHoleRenderer
         effect.Parameters["LensFalloff"].SetValue(lens.Falloff);
         effect.Parameters["LensEdge"].SetValue(lens.EdgeStart);
         effect.Parameters["LensOnly"].SetValue(0f);
-        effect.Parameters["DrawLensCore"].SetValue(1f);
         effect.Parameters["MadelineMask"].SetValue(madelineMask);
         effect.Parameters["ProtectMadeline"].SetValue(madelineMask.Z > 0f ? 1f : 0f);
         effect.Parameters["DopplerEnabled"].SetValue(hole.Doppler ? 1f : 0f);
@@ -403,9 +399,13 @@ internal static class BlackHoleRenderer
         GraphicsDevice device,
         RenderTarget2D sourceTarget,
         MadelineLens lens,
-        float time,
-        bool drawCore)
+        float time)
     {
+        if (madelineLensEffect == null || madelineLensFailed)
+        {
+            return;
+        }
+
         device.SetRenderTarget(capture);
         device.Clear(Color.Black);
         Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointClamp,
@@ -416,20 +416,14 @@ internal static class BlackHoleRenderer
         device.SetRenderTarget(sourceTarget);
         device.Clear(Color.Black);
 
-        effect!.Parameters["Hole"].SetValue(
-            new Vector4(lens.Center.X, lens.Center.Y, 0f, lens.Radius));
-        effect.Parameters["HoleParams"].SetValue(
-            new Vector4(1f, lens.Strength, lens.CoreRadius, time));
-        effect.Parameters["LensOnly"].SetValue(1f);
-        effect.Parameters["DrawLensCore"].SetValue(drawCore ? 1f : 0f);
-        effect.Parameters["ProtectMadeline"].SetValue(0f);
-        effect.Parameters["DopplerEnabled"].SetValue(0f);
-        effect.Parameters["SpecksEnabled"].SetValue(0f);
-        effect.Parameters["DiskAlpha"].SetValue(0f);
-        effect.CurrentTechnique = effect.Techniques["BlackHole"];
+        madelineLensEffect.Parameters["LensCenter"].SetValue(lens.Center);
+        madelineLensEffect.Parameters["LensRadius"].SetValue(lens.Radius);
+        madelineLensEffect.Parameters["LensStrength"].SetValue(lens.Strength);
+        madelineLensEffect.Parameters["LensFalloff"].SetValue(1.25f);
+        madelineLensEffect.CurrentTechnique = madelineLensEffect.Techniques["MadelineLens"];
 
         Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointClamp,
-            DepthStencilState.None, RasterizerState.CullNone, effect);
+            DepthStencilState.None, RasterizerState.CullNone, madelineLensEffect);
         Draw.SpriteBatch.Draw(capture, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
     }
@@ -451,45 +445,64 @@ internal static class BlackHoleRenderer
                 RenderTargetUsage.DiscardContents);
         }
 
-        if (effect != null || effectFailed)
+        if (effect == null && !effectFailed)
         {
-            return effect != null;
+            effect = LoadEffect("Celeste.Mod.BlackTheo.BlackHole.cso", "BlackHole.cso", ref effectFailed);
         }
 
+        if (madelineLensEffect == null && !madelineLensFailed)
+        {
+            madelineLensEffect = LoadEffect(
+                "Celeste.Mod.BlackTheo.MadelineLens.cso",
+                "MadelineLens.cso",
+                ref madelineLensFailed);
+        }
+
+        return effect != null;
+    }
+
+    private static Effect? LoadEffect(string resourceName, string displayName, ref bool failed)
+    {
         try
         {
             Assembly assembly = typeof(BlackHoleRenderer).Assembly;
-            using Stream? stream = assembly.GetManifestResourceStream("Celeste.Mod.BlackTheo.BlackHole.cso");
+            using Stream? stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
             {
-                throw new InvalidOperationException("Embedded BlackHole.cso was not found.");
+                throw new InvalidOperationException($"Embedded {displayName} was not found.");
             }
 
             using MemoryStream memory = new MemoryStream();
             stream.CopyTo(memory);
-            effect = new Effect(Engine.Instance.GraphicsDevice, memory.ToArray());
-            Logger.Log(LogLevel.Info, LogTag, "Black hole shader loaded.");
-            return true;
+            Effect loaded = new Effect(Engine.Instance.GraphicsDevice, memory.ToArray());
+            Logger.Log(LogLevel.Info, LogTag, $"{displayName} shader loaded.");
+            return loaded;
         }
         catch (Exception e)
         {
-            effectFailed = true;
-            Logger.Log(LogLevel.Error, LogTag, "Failed to load the black hole shader. Theo will render normally.\n" + e);
-            return false;
+            failed = true;
+            Logger.Log(LogLevel.Error, LogTag, $"Failed to load {displayName}.\n{e}");
+            return null;
         }
     }
 
     private static void SetGlobalParameters(int width, int height)
     {
-        if (effect == null)
+        SetGlobalParameters(effect, width, height);
+        SetGlobalParameters(madelineLensEffect, width, height);
+    }
+
+    private static void SetGlobalParameters(Effect? shader, int width, int height)
+    {
+        if (shader == null)
         {
             return;
         }
 
-        effect.Parameters["MatrixTransform"].SetValue(
+        shader.Parameters["MatrixTransform"].SetValue(
             Matrix.CreateScale(2f / width, -2f / height, 1f) *
             Matrix.CreateTranslation(-1f, 1f, 0f));
-        effect.Parameters["ScreenSize"].SetValue(new Vector2(width, height));
+        shader.Parameters["ScreenSize"].SetValue(new Vector2(width, height));
     }
 
     public static void DisableAfterFailure(Exception exception)
@@ -503,12 +516,15 @@ internal static class BlackHoleRenderer
     {
         effect?.Dispose();
         effect = null;
+        madelineLensEffect?.Dispose();
+        madelineLensEffect = null;
         capture?.Dispose();
         capture = null;
         Holes.Clear();
         hasSmoothedMadelineLens = false;
         smoothedMadelineLensAmount = 0f;
         effectFailed = false;
+        madelineLensFailed = false;
         renderFailed = false;
     }
 }

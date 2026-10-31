@@ -30,7 +30,6 @@ float LensFalloff;
 float LensEdge;
 float DiskAlpha;
 float LensOnly;      // 1 = 玛德琳专用透镜分支（不画盘/阴影/星尘）
-float DrawLensCore;  // 1 = 在玛德琳透镜中心绘制黑核
 float4 DiskInnerColor;
 float4 DiskMidColor;
 float4 DiskOuterColor;
@@ -203,11 +202,8 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
 
             // 径向扭曲在中心附近会折叠；黑核负责遮住中间的空心环，
             // 其半径随透镜档位缩放。
-            if (DrawLensCore > 0.5)
-            {
-                float coreRadius = max(HoleParams.z, 0.0);
-                color.rgb *= smoothstep(coreRadius - 0.75, coreRadius + 0.75, r);
-            }
+            float coreRadius = max(HoleParams.z, 0.0);
+            color.rgb *= smoothstep(coreRadius - 0.75, coreRadius + 0.75, r);
         }
 
         color.a = 1.0;
