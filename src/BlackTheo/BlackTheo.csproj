@@ -3,9 +3,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <CelesteRootPath Condition="'$(CelesteRootPath)' == ''">$(CELESTE_ROOT)</CelesteRootPath>
-    <CelesteRootPath Condition="'$(CelesteRootPath)' == ''">$(CELESTE_DIR)</CelesteRootPath>
-    <CelesteRootPath Condition="'$(CelesteRootPath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Celeste</CelesteRootPath>
+    <CelesteRootPath>K:\SteamLibrary\steamapps\common\Celeste</CelesteRootPath>
     <AssemblyName>BlackTheo</AssemblyName>
     <RootNamespace>Celeste.Mod.BlackTheo</RootNamespace>
     <LangVersion>latest</LangVersion>
