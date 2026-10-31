@@ -179,15 +179,24 @@ public sealed class BlackTheoModule : EverestModule
     {
         orig(self, target, scene);
 
-        if (!BlackTheoModule.Settings.HookBloom ||
-            target != GameplayBuffers.Level ||
+        if (target != GameplayBuffers.Level ||
             MadelineLayer.IsApplyingPlayerBloom)
         {
             return;
         }
 
-        MadelineLayer.ApplyBloomToPlayer(self, scene);
-        MadelineLayer.CompositePlayerBloom();
+        if (BlackTheoModule.Settings.HookBloom)
+        {
+            MadelineLayer.ApplyBloomToPlayer(self, scene);
+            if (!MadelineLayer.CompositePlayerBloom())
+            {
+                MadelineLayer.CompositePlayerFallback();
+            }
+        }
+        else
+        {
+            MadelineLayer.CompositePlayerFallback();
+        }
     }
 
     private static void TheoCrystal_ctor(

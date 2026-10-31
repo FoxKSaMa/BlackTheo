@@ -23,6 +23,8 @@ internal static class MadelineLayer
     private static VirtualRenderTarget? playerBloom;
     private static int captureDepth;
     private static bool hasMask;
+    private static bool hasLit;
+    private static bool hasDistorted;
     private static bool occlusionCaptured;
     private static bool applyingDistort;
     private static bool applyingPlayerBloom;
@@ -78,6 +80,8 @@ internal static class MadelineLayer
     public static void BeginFrame()
     {
         hasMask = false;
+        hasLit = false;
+        hasDistorted = false;
         occlusionCaptured = false;
         applyingDistort = false;
         applyingPlayerBloom = false;
@@ -374,6 +378,7 @@ internal static class MadelineLayer
 
         // Do not composite back here. The actual Distort.Render will be the
         // insertion point for the distorted player.
+        hasLit = true;
         device.SetRenderTarget(GameplayBuffers.Gameplay);
     }
 
@@ -417,6 +422,7 @@ internal static class MadelineLayer
         Draw.SpriteBatch.Draw(distortedLayer, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
+        hasDistorted = true;
         device.SetRenderTarget(GameplayBuffers.Gameplay);
     }
 
@@ -444,7 +450,21 @@ internal static class MadelineLayer
 
     public static void ApplyBloomToPlayer(BloomRenderer bloom, Scene scene)
     {
-        if (!hasMask || distortedLayer == null || distortedLayer.IsDisposed ||
+        RenderTarget2D? source = null;
+        if (hasDistorted && distortedLayer != null && !distortedLayer.IsDisposed)
+        {
+            source = distortedLayer;
+        }
+        else if (hasLit && litLayer != null && !litLayer.IsDisposed)
+        {
+            source = litLayer;
+        }
+        else if (playerLayer != null && !playerLayer.IsDisposed)
+        {
+            source = playerLayer;
+        }
+
+        if (!hasMask || source == null ||
             mask == null || mask.IsDisposed ||
             playerBloom == null || playerBloom.IsDisposed)
         {
@@ -463,7 +483,7 @@ internal static class MadelineLayer
             SamplerState.PointClamp,
             DepthStencilState.None,
             RasterizerState.CullNone);
-        Draw.SpriteBatch.Draw(distortedLayer, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.Draw(source, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
         applyingPlayerBloom = true;
@@ -491,10 +511,51 @@ internal static class MadelineLayer
         device.SetRenderTarget(GameplayBuffers.Level);
     }
 
-    public static void CompositePlayerBloom()
+    public static bool CompositePlayerBloom()
     {
         if (!hasMask || playerBloom == null || playerBloom.IsDisposed ||
             GameplayBuffers.Level == null)
+        {
+            return false;
+        }
+
+        GraphicsDevice device = Engine.Instance.GraphicsDevice;
+        device.SetRenderTarget(GameplayBuffers.Level);
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            PremultipliedOver,
+            SamplerState.PointWrap,
+            DepthStencilState.None,
+            RasterizerState.CullNone,
+            effect: null,
+            transformMatrix: Matrix.Identity);
+        Draw.SpriteBatch.Draw(playerBloom.Target, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
+        return true;
+    }
+
+    public static void CompositePlayerFallback()
+    {
+        if (!hasMask || GameplayBuffers.Level == null)
+        {
+            return;
+        }
+
+        RenderTarget2D? source = null;
+        if (hasDistorted && distortedLayer != null && !distortedLayer.IsDisposed)
+        {
+            source = distortedLayer;
+        }
+        else if (hasLit && litLayer != null && !litLayer.IsDisposed)
+        {
+            source = litLayer;
+        }
+        else if (playerLayer != null && !playerLayer.IsDisposed)
+        {
+            source = playerLayer;
+        }
+
+        if (source == null)
         {
             return;
         }
@@ -509,8 +570,7 @@ internal static class MadelineLayer
             RasterizerState.CullNone,
             effect: null,
             transformMatrix: Matrix.Identity);
-        //Draw.SpriteBatch.Draw(playerBloom.Target, Vector2.Zero, Color.White);
-        Draw.SpriteBatch.Draw(playerBloom.Target, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.Draw(source, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
     }
 
