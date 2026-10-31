@@ -26,6 +26,8 @@ public sealed class BlackTheoModule : EverestModule
     {
         On.Celeste.Glitch.Apply += Glitch_Apply;
         On.Celeste.TheoCrystal.ctor_Vector2 += TheoCrystal_ctor;
+        On.Celeste.GameplayRenderer.Render += GameplayRenderer_Render;
+        On.Celeste.Player.Render += Player_Render;
         Logger.Log(LogLevel.Info, "BlackTheo", "Loaded. Theo is now a lensing black hole.");
     }
 
@@ -33,6 +35,8 @@ public sealed class BlackTheoModule : EverestModule
     {
         On.Celeste.Glitch.Apply -= Glitch_Apply;
         On.Celeste.TheoCrystal.ctor_Vector2 -= TheoCrystal_ctor;
+        On.Celeste.GameplayRenderer.Render -= GameplayRenderer_Render;
+        On.Celeste.Player.Render -= Player_Render;
 
         // If this is a live unload, put the normal Theo visuals back.
         if (Engine.Scene is Level level)
@@ -43,8 +47,35 @@ public sealed class BlackTheoModule : EverestModule
             }
         }
 
+        MadelineLayer.Dispose();
         BlackHoleRenderer.Dispose();
         Logger.Log(LogLevel.Info, "BlackTheo", "Unloaded.");
+    }
+
+    private static void GameplayRenderer_Render(
+        On.Celeste.GameplayRenderer.orig_Render orig,
+        GameplayRenderer self,
+        Scene scene)
+    {
+        MadelineLayer.BeginCapture();
+        try
+        {
+            orig(self, scene);
+        }
+        finally
+        {
+            MadelineLayer.EndCapture();
+        }
+    }
+
+    private static void Player_Render(On.Celeste.Player.orig_Render orig, Player self)
+    {
+        if (MadelineLayer.IsCapturing && MadelineLayer.TryCapture(self))
+        {
+            return;
+        }
+
+        orig(self);
     }
 
     private static void TheoCrystal_ctor(
