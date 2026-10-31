@@ -26,6 +26,7 @@ internal static class MadelineLayer
     private static bool hasLit;
     private static bool hasDistorted;
     private static bool occlusionCaptured;
+    private static bool hasBackdropLayer;
     private static bool applyingDistort;
     private static bool applyingPlayerBloom;
 
@@ -83,6 +84,7 @@ internal static class MadelineLayer
         hasLit = false;
         hasDistorted = false;
         occlusionCaptured = false;
+        hasBackdropLayer = false;
         applyingDistort = false;
         applyingPlayerBloom = false;
     }
@@ -308,6 +310,7 @@ internal static class MadelineLayer
             Draw.SpriteBatch.End();
 
             occlusionCaptured = false;
+            hasBackdropLayer = true;
         }
 
         // Resume the entity batch for the remaining entities.
@@ -321,6 +324,42 @@ internal static class MadelineLayer
             RasterizerState.CullNone,
             effect: null,
             transformMatrix: level?.Camera.Matrix ?? Matrix.Identity);
+    }
+
+    public static void ClipLowerDepthPixels()
+    {
+        if (!hasMask || mask == null || mask.IsDisposed ||
+            !hasBackdropLayer || backdropLayer == null || backdropLayer.IsDisposed ||
+            GameplayBuffers.Gameplay == null)
+        {
+            return;
+        }
+
+        GraphicsDevice device = Engine.Instance.GraphicsDevice;
+        device.SetRenderTarget(GameplayBuffers.Gameplay);
+
+        // Remove everything that was drawn into the player's mask after the
+        // player (lower Depth = rendered later), then restore the pre-player
+        // snapshot under the same mask.
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            ClearMasked,
+            SamplerState.PointClamp,
+            DepthStencilState.None,
+            RasterizerState.CullNone);
+        Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
+
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            PremultipliedOver,
+            SamplerState.PointWrap,
+            DepthStencilState.None,
+            RasterizerState.CullNone,
+            effect: null,
+            transformMatrix: Matrix.Identity);
+        Draw.SpriteBatch.Draw(backdropLayer, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
     }
 
     public static void ApplyLighting(LightingRenderer lighting)
