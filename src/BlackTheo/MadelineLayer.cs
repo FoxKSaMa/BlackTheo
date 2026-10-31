@@ -18,9 +18,12 @@ internal static class MadelineLayer
     private static RenderTarget2D? litLayer;
     private static RenderTarget2D? distortedLayer;
     private static RenderTarget2D? distortMask;
+    private static RenderTarget2D? occlusionRT;
+    private static RenderTarget2D? backdropLayer;
     private static VirtualRenderTarget? playerBloom;
     private static int captureDepth;
     private static bool hasMask;
+    private static bool occlusionCaptured;
     private static bool applyingDistort;
     private static bool applyingPlayerBloom;
 
@@ -75,6 +78,7 @@ internal static class MadelineLayer
     public static void BeginFrame()
     {
         hasMask = false;
+        occlusionCaptured = false;
         applyingDistort = false;
         applyingPlayerBloom = false;
     }
@@ -162,6 +166,53 @@ internal static class MadelineLayer
     /// Runs after GameplayRenderer.Render. Copies the masked player pixels to
     /// PlayerLayer, then clears those pixels from Gameplay.
     /// </summary>
+    public static void CaptureOcclusionBeforeEntity()
+    {
+        if (occlusionCaptured || !IsCapturing ||
+            GameplayBuffers.Gameplay == null)
+        {
+            return;
+        }
+
+        EnsureTargets();
+        if (occlusionRT == null || occlusionRT.IsDisposed)
+        {
+            return;
+        }
+
+        Level? level = Engine.Scene as Level;
+        GraphicsDevice device = Engine.Instance.GraphicsDevice;
+
+        Draw.SpriteBatch.End();
+        try
+        {
+            device.SetRenderTarget(occlusionRT);
+            device.Clear(Color.Transparent);
+            Draw.SpriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                BlendState.Opaque,
+                SamplerState.PointClamp,
+                DepthStencilState.None,
+                RasterizerState.CullNone);
+            Draw.SpriteBatch.Draw(GameplayBuffers.Gameplay, Vector2.Zero, Color.White);
+            Draw.SpriteBatch.End();
+        }
+        finally
+        {
+            device.SetRenderTarget(GameplayBuffers.Gameplay);
+            Draw.SpriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                BlendState.AlphaBlend,
+                SamplerState.PointWrap,
+                DepthStencilState.None,
+                RasterizerState.CullNone,
+                effect: null,
+                transformMatrix: level?.Camera.Matrix ?? Matrix.Identity);
+        }
+
+        occlusionCaptured = true;
+    }
+
     public static void ExtractPlayerLayer()
     {
         if (!hasMask || mask == null || mask.IsDisposed ||
@@ -177,6 +228,10 @@ internal static class MadelineLayer
         }
 
         GraphicsDevice device = Engine.Instance.GraphicsDevice;
+
+        // Player.Render left the entity SpriteBatch active; close it before
+        // switching render targets for the extraction passes.
+        Draw.SpriteBatch.End();
 
         // 1. Copy Gameplay, then keep only the masked player pixels.
         device.SetRenderTarget(playerLayer);
@@ -210,6 +265,58 @@ internal static class MadelineLayer
             RasterizerState.CullNone);
         Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
+
+        // 3. Restore the Gameplay pixels that were behind the player. The
+        //    snapshot was taken before the first depth-0 entity rendered.
+        if (occlusionCaptured && occlusionRT != null && !occlusionRT.IsDisposed &&
+            backdropLayer != null && !backdropLayer.IsDisposed)
+        {
+            device.SetRenderTarget(backdropLayer);
+            device.Clear(Color.Transparent);
+            Draw.SpriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                BlendState.Opaque,
+                SamplerState.PointClamp,
+                DepthStencilState.None,
+                RasterizerState.CullNone);
+            Draw.SpriteBatch.Draw(occlusionRT, Vector2.Zero, Color.White);
+            Draw.SpriteBatch.End();
+
+            Draw.SpriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                MaskMultiply,
+                SamplerState.PointClamp,
+                DepthStencilState.None,
+                RasterizerState.CullNone);
+            Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
+            Draw.SpriteBatch.End();
+
+            device.SetRenderTarget(GameplayBuffers.Gameplay);
+            Draw.SpriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                PremultipliedOver,
+                SamplerState.PointWrap,
+                DepthStencilState.None,
+                RasterizerState.CullNone,
+                effect: null,
+                transformMatrix: Matrix.Identity);
+            Draw.SpriteBatch.Draw(backdropLayer, Vector2.Zero, Color.White);
+            Draw.SpriteBatch.End();
+
+            occlusionCaptured = false;
+        }
+
+        // Resume the entity batch for the remaining entities.
+        Level? level = Engine.Scene as Level;
+        device.SetRenderTarget(GameplayBuffers.Gameplay);
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            BlendState.AlphaBlend,
+            SamplerState.PointWrap,
+            DepthStencilState.None,
+            RasterizerState.CullNone,
+            effect: null,
+            transformMatrix: level?.Camera.Matrix ?? Matrix.Identity);
     }
 
     public static void ApplyLighting(LightingRenderer lighting)
@@ -402,6 +509,7 @@ internal static class MadelineLayer
             RasterizerState.CullNone,
             effect: null,
             transformMatrix: Matrix.Identity);
+        //Draw.SpriteBatch.Draw(playerBloom.Target, Vector2.Zero, Color.White);
         Draw.SpriteBatch.Draw(playerBloom.Target, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
     }
@@ -489,6 +597,36 @@ internal static class MadelineLayer
                 RenderTargetUsage.PreserveContents);
         }
 
+        if (occlusionRT == null || occlusionRT.IsDisposed ||
+            occlusionRT.Width != gameplay.Width || occlusionRT.Height != gameplay.Height)
+        {
+            occlusionRT?.Dispose();
+            occlusionRT = new RenderTarget2D(
+                Engine.Instance.GraphicsDevice,
+                gameplay.Width,
+                gameplay.Height,
+                mipMap: false,
+                SurfaceFormat.Color,
+                DepthFormat.None,
+                0,
+                RenderTargetUsage.PreserveContents);
+        }
+
+        if (backdropLayer == null || backdropLayer.IsDisposed ||
+            backdropLayer.Width != gameplay.Width || backdropLayer.Height != gameplay.Height)
+        {
+            backdropLayer?.Dispose();
+            backdropLayer = new RenderTarget2D(
+                Engine.Instance.GraphicsDevice,
+                gameplay.Width,
+                gameplay.Height,
+                mipMap: false,
+                SurfaceFormat.Color,
+                DepthFormat.None,
+                0,
+                RenderTargetUsage.PreserveContents);
+        }
+
         if (playerBloom == null || playerBloom.IsDisposed ||
             playerBloom.Width != gameplay.Width || playerBloom.Height != gameplay.Height)
         {
@@ -514,6 +652,10 @@ internal static class MadelineLayer
         distortedLayer = null;
         distortMask?.Dispose();
         distortMask = null;
+        occlusionRT?.Dispose();
+        occlusionRT = null;
+        backdropLayer?.Dispose();
+        backdropLayer = null;
         playerBloom?.Dispose();
         playerBloom = null;
         captureDepth = 0;

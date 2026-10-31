@@ -52,6 +52,7 @@ public sealed class BlackTheoModule : EverestModule
         On.Celeste.Glitch.Apply += Glitch_Apply;
         On.Celeste.TheoCrystal.ctor_Vector2 += TheoCrystal_ctor;
         On.Celeste.GameplayRenderer.Render += GameplayRenderer_Render;
+        On.Monocle.EntityList.RenderExcept += EntityList_RenderExcept;
         On.Celeste.LightingRenderer.Render += LightingRenderer_Render;
         On.Celeste.BloomRenderer.Apply += BloomRenderer_Apply;
         On.Celeste.Player.Render += Player_Render;
@@ -63,6 +64,7 @@ public sealed class BlackTheoModule : EverestModule
         On.Celeste.Glitch.Apply -= Glitch_Apply;
         On.Celeste.TheoCrystal.ctor_Vector2 -= TheoCrystal_ctor;
         On.Celeste.GameplayRenderer.Render -= GameplayRenderer_Render;
+        On.Monocle.EntityList.RenderExcept -= EntityList_RenderExcept;
         On.Celeste.LightingRenderer.Render -= LightingRenderer_Render;
         On.Celeste.BloomRenderer.Apply -= BloomRenderer_Apply;
         On.Celeste.Player.Render -= Player_Render;
@@ -106,7 +108,36 @@ public sealed class BlackTheoModule : EverestModule
         finally
         {
             MadelineLayer.EndCapture();
-            MadelineLayer.ExtractPlayerLayer();
+        }
+    }
+
+    private static void EntityList_RenderExcept(
+        On.Monocle.EntityList.orig_RenderExcept orig,
+        EntityList self,
+        int excludeTags)
+    {
+        if (!BlackTheoModule.Settings.HookEntityList ||
+            !MadelineLayer.IsCapturing)
+        {
+            orig(self, excludeTags);
+            return;
+        }
+
+        Player? player = (Engine.Scene as Level)?.Tracker.GetEntity<Player>();
+
+        foreach (Entity entity in self)
+        {
+            if (!entity.Visible || entity.TagCheck(excludeTags))
+            {
+                continue;
+            }
+
+            if (player != null && entity.Depth == player.Depth)
+            {
+                MadelineLayer.CaptureOcclusionBeforeEntity();
+            }
+
+            entity.Render();
         }
     }
 
@@ -116,6 +147,9 @@ public sealed class BlackTheoModule : EverestModule
             MadelineLayer.IsCapturing)
         {
             MadelineLayer.CaptureMask(self);
+            orig(self);
+            MadelineLayer.ExtractPlayerLayer();
+            return;
         }
 
         orig(self);

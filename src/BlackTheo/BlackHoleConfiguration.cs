@@ -273,6 +273,10 @@ public sealed class BlackTheoSettings : EverestModuleSettings
     [SettingSubText("blacktheo_hook_gameplay_help")]
     public bool HookGameplayRenderer { get; set; } = true;
 
+    [SettingName("blacktheo_hook_entitylist")]
+    [SettingSubText("blacktheo_hook_entitylist_help")]
+    public bool HookEntityList { get; set; } = true;
+
     [SettingName("blacktheo_hook_player")]
     [SettingSubText("blacktheo_hook_player_help")]
     public bool HookPlayerRender { get; set; } = true;
