@@ -4,7 +4,7 @@
 
 适用于 Celeste 1.4.0.0（Everest / FNA，Windows x64）。
 
-- 当前版本：**1.3.1**
+- 当前版本：**1.4.0**
 - GitHub：[FoxKSaMa/BlackTheo](https://github.com/FoxKSaMa/BlackTheo)
 - 下载：[Releases](https://github.com/FoxKSaMa/BlackTheo/releases)
 
@@ -33,7 +33,7 @@
 
 ## 安装
 
-1. 从 [Releases](https://github.com/FoxKSaMa/BlackTheo/releases) 下载 `BlackTheo-1.3.1.zip`
+1. 从 [Releases](https://github.com/FoxKSaMa/BlackTheo/releases) 下载 `BlackTheo-1.4.0.zip`
 2. 解压出 `BlackTheo` 文件夹
 3. 放到：
 
@@ -55,6 +55,7 @@
 |---|---|---|
 | 开关 | 开 / 关 | 开 |
 | 黑洞引力透镜强度 | 0–10（0 关闭，2 为 Low，10 为 High） | 2 |
+| Theo 引力透镜影响玛德琳 | 开 / 关 | 开 |
 | 吸积盘颜色 | 蓝色 / 冰蓝 / 红橙色 / 紫色 / 幽绿色 / 尘土黄 / 白色 / 粉色 / 棕色 / 深红色 / 灰色 / 自定义 | 蓝色 |
 | 自定义吸积盘颜色 | 主菜单输入，见下文 | `FF7A45` |
 | 多普勒效应 | 开 / 关 | 开 |
@@ -68,6 +69,15 @@
 - `2`：原来的 Low
 - `10`：原来的 High
 - 中间档位会连续插值强度、影响半径、衰减和边缘过渡
+
+### Theo 引力透镜影响玛德琳
+
+默认开启。
+
+- **开**：Theo 黑洞的屏幕空间透镜会正常扭曲包括玛德琳在内的整个画面
+- **关**：玛德琳的精灵及其周围一小块区域不受 Theo 透镜扭曲；Theo 的事件视界和吸积盘仍然按正常遮挡关系绘制
+
+实现上使用一个跟随玛德琳的屏幕空间椭圆遮罩。目标像素或透镜采样源像素落在遮罩内时，会改用未扭曲的原画面，避免她的贴图被拉伸或复制到透镜环里。
 
 ### 多普勒效应
 

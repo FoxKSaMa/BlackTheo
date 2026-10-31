@@ -1,4 +1,5 @@
 blacktheo_lens=Black hole lens strength
+blacktheo_theo_lens_madeline=Theo lens affects Madeline
 blacktheo_disk_color=Accretion disk color
 blacktheo_custom_color=Custom disk color
 blacktheo_custom_color_help=RRGGBB or RRGGBBAA; # optional. Invalid input falls back to Ice blue #50B4FF.

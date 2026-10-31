@@ -1,4 +1,4 @@
-# Build output
+﻿# Build output
 **/bin/
 **/obj/
 .vs/
@@ -16,3 +16,7 @@ _tools/
 _*.txt
 _*.png
 *.zip
+
+# Local reference source
+_ref/
+

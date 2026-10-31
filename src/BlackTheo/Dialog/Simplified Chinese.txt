@@ -1,4 +1,5 @@
 blacktheo_lens=黑洞引力透镜强度
+blacktheo_theo_lens_madeline=Theo引力透镜影响玛德琳
 blacktheo_disk_color=吸积盘颜色
 blacktheo_custom_color=自定义吸积盘颜色
 blacktheo_custom_color_help=RRGGBB或RRGGBBAA，#可省略；非法输入会回退到冰蓝色 #50B4FF

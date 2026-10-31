@@ -103,6 +103,7 @@ internal static class BlackHoleRenderer
 
         CollectHoles(level);
         MadelineLens? madelineLens = CollectMadelineLens(level, settings);
+        Vector4 madelineMask = GetMadelineMask(level, settings);
         if (Holes.Count == 0 && madelineLens == null)
         {
             return;
@@ -131,7 +132,7 @@ internal static class BlackHoleRenderer
         // in one ps_3_0 shader.
         for (int i = 0; i < Holes.Count; i++)
         {
-            ApplyHole(device, sourceTarget, Holes[i], time);
+            ApplyHole(device, sourceTarget, Holes[i], time, madelineMask);
         }
 
         if (madelineLens != null)
@@ -140,7 +141,12 @@ internal static class BlackHoleRenderer
         }
     }
 
-    private static void ApplyHole(GraphicsDevice device, RenderTarget2D sourceTarget, Hole hole, float time)
+    private static void ApplyHole(
+        GraphicsDevice device,
+        RenderTarget2D sourceTarget,
+        Hole hole,
+        float time,
+        Vector4 madelineMask)
     {
         // Capture the current level target. We cannot sample and write the
         // same render target in one pass, so this is the shader source.
@@ -164,6 +170,8 @@ internal static class BlackHoleRenderer
         effect.Parameters["LensFalloff"].SetValue(lens.Falloff);
         effect.Parameters["LensEdge"].SetValue(lens.EdgeStart);
         effect.Parameters["LensOnly"].SetValue(0f);
+        effect.Parameters["MadelineMask"].SetValue(madelineMask);
+        effect.Parameters["ProtectMadeline"].SetValue(madelineMask.Z > 0f ? 1f : 0f);
         effect.Parameters["DopplerEnabled"].SetValue(hole.Doppler ? 1f : 0f);
         effect.Parameters["SpecksEnabled"].SetValue(hole.Specks ? 1f : 0f);
         effect.Parameters["NoiseSeed"].SetValue((float)hole.Seed);
@@ -257,6 +265,23 @@ internal static class BlackHoleRenderer
                 Holes.RemoveAt(farthest);
             }
         }
+    }
+
+    private static Vector4 GetMadelineMask(Level level, BlackTheoSettings settings)
+    {
+        if (settings.TheoLensAffectsMadeline)
+        {
+            return Vector4.Zero;
+        }
+
+        Player? player = level.Tracker.GetEntity<Player>();
+        if (player == null || !player.Active || !player.Visible || player.Dead)
+        {
+            return Vector4.Zero;
+        }
+
+        Vector2 center = player.Center - level.Camera.Position;
+        return new Vector4(center.X, center.Y, 16f, 28f);
     }
 
     private static MadelineLens? CollectMadelineLens(Level level, BlackTheoSettings settings)
@@ -389,6 +414,7 @@ internal static class BlackHoleRenderer
         effect.Parameters["HoleParams"].SetValue(
             new Vector4(1f, lens.Strength, lens.CoreRadius, time));
         effect.Parameters["LensOnly"].SetValue(1f);
+        effect.Parameters["ProtectMadeline"].SetValue(0f);
         effect.Parameters["DopplerEnabled"].SetValue(0f);
         effect.Parameters["SpecksEnabled"].SetValue(0f);
         effect.Parameters["DiskAlpha"].SetValue(0f);

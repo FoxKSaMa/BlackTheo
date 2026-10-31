@@ -35,6 +35,8 @@ float4 DiskMidColor;
 float4 DiskOuterColor;
 float4 PhotonColor;
 float4 RingColor;    // 外围散射 / 光晕颜色
+float4 MadelineMask; // xy = 玛德琳屏幕中心，zw = 半宽 / 半高
+float ProtectMadeline; // 1 = 把玛德琳从 Theo 透镜中排除
 
 #define TAU 6.28318530718
 #define PI 3.14159265
@@ -139,6 +141,18 @@ float3 horizonSpecks(float2 pixel, float time, float shadowRadius, float3 ca, fl
     return result;
 }
 
+// 玛德琳保护遮罩：返回 0..1，1 表示该屏幕像素属于玛德琳。
+float MadelineMaskAt(float2 p)
+{
+    if (ProtectMadeline < 0.5)
+    {
+        return 0.0;
+    }
+
+    float2 q = (p - MadelineMask.xy) / max(MadelineMask.zw, float2(1.0, 1.0));
+    return 1.0 - smoothstep(0.72, 1.0, length(q));
+}
+
 // 类史瓦西零测地线加速度；h2 是角动量平方。
 float3 LensAccel(float3 p, float h2)
 {
@@ -156,6 +170,7 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
     float time = HoleParams.w;
 
     float4 color = tex2D(ScreenSampler, uv);
+    float3 originalColor = color.rgb;
 
     // 玛德琳专用的纯透镜分支。这里刻意不画吸积盘和光子环，
     // 只弯折已经合成好的屏幕；中心由单独的黑核遮住。
@@ -313,7 +328,16 @@ float4 PS(float2 uv : TEXCOORD0) : COLOR0
             }
 
             offsetPixels.y = -offsetPixels.y;
-            background = tex2D(ScreenSampler, saturate((pixel + offsetPixels) / ScreenSize)).rgb;
+
+            // 关闭“Theo 透镜影响玛德琳”时，目标像素或采样源像素只要
+            // 有一个落在她的遮罩里，就改用未扭曲的原画面，避免她的
+            // 贴图被拉伸或复制到透镜环里。
+            float2 samplePoint = pixel + offsetPixels;
+            float protect = max(MadelineMaskAt(pixel), MadelineMaskAt(samplePoint));
+            float3 sampled = tex2D(
+                ScreenSampler,
+                saturate(samplePoint / ScreenSize)).rgb;
+            background = lerp(sampled, originalColor, protect);
         }
 
         float shadow = 1.0 - smoothstep(shadowRadius - 0.75, shadowRadius + 0.75, screenRadius);

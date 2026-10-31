@@ -228,6 +228,9 @@ public sealed class BlackTheoSettings : EverestModuleSettings
     [SettingName("blacktheo_lens")]
     public LensStrengthMode LensStrength { get; set; } = LensStrengthMode.Low;
 
+    [SettingName("blacktheo_theo_lens_madeline")]
+    public bool TheoLensAffectsMadeline { get; set; } = true;
+
     [SettingName("blacktheo_disk_color")]
     public DiskColorMode DiskColor { get; set; } = DiskColorMode.Blue;
 
