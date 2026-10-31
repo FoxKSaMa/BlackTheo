@@ -9,6 +9,12 @@
     </ItemGroup>
     <Copy SourceFiles="@(_CompileOutput)" DestinationFolder="$(ModAssetsFolderName)/Code/%(RecursiveDir)" SkipUnchangedFiles="true"/>
 
+    <!-- Hot reload convenience: write the new DLL directly into the
+         installed mod's Code folder. The running game can reload it with F5. -->
+    <Copy SourceFiles="@(_CompileOutput)"
+          DestinationFolder="$(CelesteRootPath)/Mods/$(AssemblyName)/Code/%(RecursiveDir)"
+          SkipUnchangedFiles="true"/>
+
     <CallTarget Condition="$(ModAssetsCopyType) == 'link'" Targets="CheckAndCreateSymbolicLink"/>
     <CallTarget Condition="$(ModAssetsCopyType) == 'copy'" Targets="CopyModFolder"/>
   </Target>
