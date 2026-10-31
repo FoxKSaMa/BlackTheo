@@ -108,7 +108,7 @@ public sealed class BlackTheoModule : EverestModule
         finally
         {
             MadelineLayer.EndCapture();
-            MadelineLayer.ClipLowerDepthPixels();
+            MadelineLayer.ClipPlayerLayerAgainstFront();
         }
     }
 
