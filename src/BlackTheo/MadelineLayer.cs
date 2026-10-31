@@ -16,7 +16,9 @@ internal static class MadelineLayer
 {
     private static RenderTarget2D? layer;
     private static RenderTarget2D? mask;
+    private static RenderTarget2D? litLayer;
     private static int captureDepth;
+    private static bool hasMask;
 
     private static readonly BlendState PremultipliedOver = new()
     {
@@ -28,9 +30,28 @@ internal static class MadelineLayer
         AlphaBlendFunction = BlendFunction.Add
     };
 
+    // Incoming mask alpha multiplies the already-lit destination. This keeps
+    // only the Madeline pixels and zeroes both RGB and alpha everywhere else.
+    private static readonly BlendState MaskMultiply = new()
+    {
+        ColorSourceBlend = Blend.Zero,
+        ColorDestinationBlend = Blend.SourceAlpha,
+        AlphaSourceBlend = Blend.Zero,
+        AlphaDestinationBlend = Blend.SourceAlpha,
+        ColorBlendFunction = BlendFunction.Add,
+        AlphaBlendFunction = BlendFunction.Add
+    };
+
     public static RenderTarget2D? Mask => mask;
 
+    public static RenderTarget2D? LitLayer => litLayer;
+
     public static bool IsCapturing => captureDepth > 0;
+
+    public static void BeginFrame()
+    {
+        hasMask = false;
+    }
 
     public static void BeginCapture()
     {
@@ -100,6 +121,8 @@ internal static class MadelineLayer
                 RasterizerState.CullNone);
             Draw.SpriteBatch.Draw(layer, Vector2.Zero, Color.White);
             Draw.SpriteBatch.End();
+
+            hasMask = true;
         }
         finally
         {
@@ -130,6 +153,49 @@ internal static class MadelineLayer
         }
 
         return true;
+    }
+
+    public static void CaptureLitLayer()
+    {
+        if (!hasMask || mask == null || mask.IsDisposed ||
+            GameplayBuffers.Gameplay == null)
+        {
+            return;
+        }
+
+        EnsureTargets();
+        if (litLayer == null || litLayer.IsDisposed)
+        {
+            return;
+        }
+
+        GraphicsDevice device = Engine.Instance.GraphicsDevice;
+
+        // 1. Copy the lit Gameplay target.
+        device.SetRenderTarget(litLayer);
+        device.Clear(Color.Transparent);
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            BlendState.Opaque,
+            SamplerState.PointClamp,
+            DepthStencilState.None,
+            RasterizerState.CullNone);
+        Draw.SpriteBatch.Draw(GameplayBuffers.Gameplay, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
+
+        // 2. Keep only pixels covered by the saved Madeline mask.
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            MaskMultiply,
+            SamplerState.PointClamp,
+            DepthStencilState.None,
+            RasterizerState.CullNone);
+        Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
+
+        // Lighting.Render ran against Gameplay; restore that target so the
+        // following Level.Render stage behaves normally.
+        device.SetRenderTarget(GameplayBuffers.Gameplay);
     }
 
     private static void EnsureTargets()
@@ -169,6 +235,21 @@ internal static class MadelineLayer
                 0,
                 RenderTargetUsage.DiscardContents);
         }
+
+        if (litLayer == null || litLayer.IsDisposed ||
+            litLayer.Width != gameplay.Width || litLayer.Height != gameplay.Height)
+        {
+            litLayer?.Dispose();
+            litLayer = new RenderTarget2D(
+                Engine.Instance.GraphicsDevice,
+                gameplay.Width,
+                gameplay.Height,
+                mipMap: false,
+                SurfaceFormat.Color,
+                DepthFormat.None,
+                0,
+                RenderTargetUsage.DiscardContents);
+        }
     }
 
     public static void Dispose()
@@ -177,6 +258,9 @@ internal static class MadelineLayer
         layer = null;
         mask?.Dispose();
         mask = null;
+        litLayer?.Dispose();
+        litLayer = null;
         captureDepth = 0;
+        hasMask = false;
     }
 }

@@ -30,7 +30,7 @@ public sealed class BlackTheoModule : EverestModule
             LogLevel.Error => LycarionLogLevel.Error,
             _ => LycarionLogLevel.Info
         };
-        if (tag == "BlackTheo")
+        //if (tag == "BlackTheo")
             LycarionLogger.Log(lvl, tag, message);
 
         orig(level, tag, message);
@@ -43,7 +43,7 @@ public sealed class BlackTheoModule : EverestModule
 
     public override void Load()
     {
-        LycarionLogger.Initialize(8087);
+        LycarionLogger.Initialize(18080);
         LogHook = new Hook(
             typeof(Logger).GetMethod("Log", [typeof(LogLevel), typeof(string), typeof(string)])!,
             Logger_Log_Hook
@@ -52,6 +52,7 @@ public sealed class BlackTheoModule : EverestModule
         On.Celeste.Glitch.Apply += Glitch_Apply;
         On.Celeste.TheoCrystal.ctor_Vector2 += TheoCrystal_ctor;
         On.Celeste.GameplayRenderer.Render += GameplayRenderer_Render;
+        On.Celeste.LightingRenderer.Render += LightingRenderer_Render;
         On.Celeste.Player.Render += Player_Render;
         Logger.Log(LogLevel.Info, "BlackTheo", "Loaded. Theo is now a lensing black hole.");
     }
@@ -61,6 +62,7 @@ public sealed class BlackTheoModule : EverestModule
         On.Celeste.Glitch.Apply -= Glitch_Apply;
         On.Celeste.TheoCrystal.ctor_Vector2 -= TheoCrystal_ctor;
         On.Celeste.GameplayRenderer.Render -= GameplayRenderer_Render;
+        On.Celeste.LightingRenderer.Render -= LightingRenderer_Render;
         On.Celeste.Player.Render -= Player_Render;
 
         // If this is a live unload, put the normal Theo visuals back.
@@ -85,6 +87,8 @@ public sealed class BlackTheoModule : EverestModule
         GameplayRenderer self,
         Scene scene)
     {
+        MadelineLayer.BeginFrame();
+
         if (!BlackTheoModule.Settings.MadelineLayerCapture)
         {
             orig(self, scene);
@@ -100,6 +104,15 @@ public sealed class BlackTheoModule : EverestModule
         {
             MadelineLayer.EndCapture();
         }
+    }
+
+    private static void LightingRenderer_Render(
+        On.Celeste.LightingRenderer.orig_Render orig,
+        LightingRenderer self,
+        Scene scene)
+    {
+        orig(self, scene);
+        MadelineLayer.CaptureLitLayer();
     }
 
     private static void Player_Render(On.Celeste.Player.orig_Render orig, Player self)
