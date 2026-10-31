@@ -57,6 +57,12 @@ public sealed class BlackTheoModule : EverestModule
         GameplayRenderer self,
         Scene scene)
     {
+        if (!BlackTheoModule.Settings.MadelineLayerCapture)
+        {
+            orig(self, scene);
+            return;
+        }
+
         MadelineLayer.BeginCapture();
         try
         {
