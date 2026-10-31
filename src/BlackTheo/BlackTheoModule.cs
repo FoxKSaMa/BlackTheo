@@ -53,7 +53,7 @@ public sealed class BlackTheoModule : EverestModule
         On.Celeste.TheoCrystal.ctor_Vector2 += TheoCrystal_ctor;
         On.Celeste.GameplayRenderer.Render += GameplayRenderer_Render;
         On.Celeste.LightingRenderer.Render += LightingRenderer_Render;
-        On.Celeste.Distort.Render += Distort_Render;
+        On.Celeste.BloomRenderer.Apply += BloomRenderer_Apply;
         On.Celeste.Player.Render += Player_Render;
         Logger.Log(LogLevel.Info, "BlackTheo", "Loaded. Theo is now a lensing black hole.");
     }
@@ -64,7 +64,7 @@ public sealed class BlackTheoModule : EverestModule
         On.Celeste.TheoCrystal.ctor_Vector2 -= TheoCrystal_ctor;
         On.Celeste.GameplayRenderer.Render -= GameplayRenderer_Render;
         On.Celeste.LightingRenderer.Render -= LightingRenderer_Render;
-        On.Celeste.Distort.Render -= Distort_Render;
+        On.Celeste.BloomRenderer.Apply -= BloomRenderer_Apply;
         On.Celeste.Player.Render -= Player_Render;
 
         // If this is a live unload, put the normal Theo visuals back.
@@ -91,7 +91,8 @@ public sealed class BlackTheoModule : EverestModule
     {
         MadelineLayer.BeginFrame();
 
-        if (!BlackTheoModule.Settings.MadelineLayerCapture)
+        if (!BlackTheoModule.Settings.HookGameplayRenderer ||
+            !BlackTheoModule.Settings.MadelineLayerCapture)
         {
             orig(self, scene);
             return;
@@ -111,7 +112,8 @@ public sealed class BlackTheoModule : EverestModule
 
     private static void Player_Render(On.Celeste.Player.orig_Render orig, Player self)
     {
-        if (MadelineLayer.IsCapturing)
+        if (BlackTheoModule.Settings.HookPlayerRender &&
+            MadelineLayer.IsCapturing)
         {
             MadelineLayer.CaptureMask(self);
         }
@@ -125,22 +127,33 @@ public sealed class BlackTheoModule : EverestModule
         Scene scene)
     {
         orig(self, scene);
+
+        if (!BlackTheoModule.Settings.HookLighting)
+        {
+            return;
+        }
+
         MadelineLayer.ApplyLighting(self);
         MadelineLayer.ApplyDistort();
     }
 
-    private static void Distort_Render(
-        On.Celeste.Distort.orig_Render orig,
-        Texture2D source,
-        Texture2D map,
-        bool hasDistortion)
+    private static void BloomRenderer_Apply(
+        On.Celeste.BloomRenderer.orig_Apply orig,
+        BloomRenderer self,
+        VirtualRenderTarget target,
+        Scene scene)
     {
-        orig(source, map, hasDistortion);
+        orig(self, target, scene);
 
-        if (!MadelineLayer.IsApplyingDistort)
+        if (!BlackTheoModule.Settings.HookBloom ||
+            target != GameplayBuffers.Level ||
+            MadelineLayer.IsApplyingPlayerBloom)
         {
-            MadelineLayer.CompositeDistortedLayer();
+            return;
         }
+
+        MadelineLayer.ApplyBloomToPlayer(self, scene);
+        MadelineLayer.CompositePlayerBloom();
     }
 
     private static void TheoCrystal_ctor(
@@ -172,6 +185,11 @@ public sealed class BlackTheoModule : EverestModule
         // not. Post-processing here therefore warps the screen behind Theo
         // without warping the HUD.
         orig(source, timer, seed, amplitude);
+
+        if (!BlackTheoModule.Settings.HookGlitch)
+        {
+            return;
+        }
 
         try
         {

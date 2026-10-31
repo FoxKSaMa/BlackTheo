@@ -269,5 +269,25 @@ public sealed class BlackTheoSettings : EverestModuleSettings
     [SettingSubText("blacktheo_madeline_layer_help")]
     public bool MadelineLayerCapture { get; set; } = false;
 
+    [SettingName("blacktheo_hook_gameplay")]
+    [SettingSubText("blacktheo_hook_gameplay_help")]
+    public bool HookGameplayRenderer { get; set; } = true;
+
+    [SettingName("blacktheo_hook_player")]
+    [SettingSubText("blacktheo_hook_player_help")]
+    public bool HookPlayerRender { get; set; } = true;
+
+    [SettingName("blacktheo_hook_lighting")]
+    [SettingSubText("blacktheo_hook_lighting_help")]
+    public bool HookLighting { get; set; } = true;
+
+    [SettingName("blacktheo_hook_bloom")]
+    [SettingSubText("blacktheo_hook_bloom_help")]
+    public bool HookBloom { get; set; } = true;
+
+    [SettingName("blacktheo_hook_glitch")]
+    [SettingSubText("blacktheo_hook_glitch_help")]
+    public bool HookGlitch { get; set; } = true;
+
     private int madelineLensLevel = 2;
 }

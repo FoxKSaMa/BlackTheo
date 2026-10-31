@@ -10,6 +10,16 @@ blacktheo_madeline_level=Madeline lens strength
 blacktheo_madeline_speed_help=Speed: lens strength follows Madeline's speed.
 blacktheo_madeline_layer=Madeline layer capture (experimental)
 blacktheo_madeline_layer_help=Render Madeline to a separate RT and build an exact pixel mask.
+blacktheo_hook_gameplay=GameplayRenderer hook
+blacktheo_hook_gameplay_help=Enable the GameplayRenderer capture/extract hook.
+blacktheo_hook_player=Player mask hook
+blacktheo_hook_player_help=Enable the Player.Render mask capture hook.
+blacktheo_hook_lighting=Lighting hook
+blacktheo_hook_lighting_help=Enable the separate lighting and Distort pass for the player layer.
+blacktheo_hook_bloom=Bloom hook
+blacktheo_hook_bloom_help=Enable Bloom processing and recomposition for the player layer.
+blacktheo_hook_glitch=Glitch / black hole hook
+blacktheo_hook_glitch_help=Enable the Glitch postfix that draws the Theo black hole.
 blacktheo_enabled=Toggle
 
 modoptions_blacktheo_lensstrength_off=Off

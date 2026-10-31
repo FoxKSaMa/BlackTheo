@@ -18,9 +18,11 @@ internal static class MadelineLayer
     private static RenderTarget2D? litLayer;
     private static RenderTarget2D? distortedLayer;
     private static RenderTarget2D? distortMask;
+    private static VirtualRenderTarget? playerBloom;
     private static int captureDepth;
     private static bool hasMask;
     private static bool applyingDistort;
+    private static bool applyingPlayerBloom;
 
     private static readonly BlendState PremultipliedOver = new()
     {
@@ -66,12 +68,15 @@ internal static class MadelineLayer
 
     public static bool IsApplyingDistort => applyingDistort;
 
+    public static bool IsApplyingPlayerBloom => applyingPlayerBloom;
+
     public static bool IsCapturing => captureDepth > 0;
 
     public static void BeginFrame()
     {
         hasMask = false;
         applyingDistort = false;
+        applyingPlayerBloom = false;
     }
 
     public static void BeginCapture()
@@ -330,6 +335,77 @@ internal static class MadelineLayer
         Draw.SpriteBatch.End();
     }
 
+    public static void ApplyBloomToPlayer(BloomRenderer bloom, Scene scene)
+    {
+        if (!hasMask || distortedLayer == null || distortedLayer.IsDisposed ||
+            mask == null || mask.IsDisposed ||
+            playerBloom == null || playerBloom.IsDisposed)
+        {
+            return;
+        }
+
+        GraphicsDevice device = Engine.Instance.GraphicsDevice;
+
+        // Copy the distorted player into a VirtualRenderTarget so that the
+        // original BloomRenderer.Apply can process it directly.
+        device.SetRenderTarget(playerBloom.Target);
+        device.Clear(Color.Transparent);
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            BlendState.Opaque,
+            SamplerState.PointClamp,
+            DepthStencilState.None,
+            RasterizerState.CullNone);
+        Draw.SpriteBatch.Draw(distortedLayer, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
+
+        applyingPlayerBloom = true;
+        try
+        {
+            bloom.Apply(playerBloom, scene);
+        }
+        finally
+        {
+            applyingPlayerBloom = false;
+        }
+
+        // Bloom keeps the destination alpha, but re-apply the mask so only
+        // player pixels remain in the final player bloom layer.
+        device.SetRenderTarget(playerBloom.Target);
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            MaskMultiply,
+            SamplerState.PointClamp,
+            DepthStencilState.None,
+            RasterizerState.CullNone);
+        Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
+
+        device.SetRenderTarget(GameplayBuffers.Level);
+    }
+
+    public static void CompositePlayerBloom()
+    {
+        if (!hasMask || playerBloom == null || playerBloom.IsDisposed ||
+            GameplayBuffers.Level == null)
+        {
+            return;
+        }
+
+        GraphicsDevice device = Engine.Instance.GraphicsDevice;
+        device.SetRenderTarget(GameplayBuffers.Level);
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            PremultipliedOver,
+            SamplerState.PointWrap,
+            DepthStencilState.None,
+            RasterizerState.CullNone,
+            effect: null,
+            transformMatrix: Matrix.Identity);
+        Draw.SpriteBatch.Draw(playerBloom.Target, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
+    }
+
     private static void EnsureTargets()
     {
         VirtualRenderTarget? gameplay = GameplayBuffers.Gameplay;
@@ -412,6 +488,18 @@ internal static class MadelineLayer
                 0,
                 RenderTargetUsage.PreserveContents);
         }
+
+        if (playerBloom == null || playerBloom.IsDisposed ||
+            playerBloom.Width != gameplay.Width || playerBloom.Height != gameplay.Height)
+        {
+            playerBloom?.Dispose();
+            playerBloom = VirtualContent.CreateRenderTarget(
+                "BlackTheo/PlayerBloom",
+                gameplay.Width,
+                gameplay.Height,
+                depth: false,
+                preserve: true);
+        }
     }
 
     public static void Dispose()
@@ -426,8 +514,11 @@ internal static class MadelineLayer
         distortedLayer = null;
         distortMask?.Dispose();
         distortMask = null;
+        playerBloom?.Dispose();
+        playerBloom = null;
         captureDepth = 0;
         hasMask = false;
         applyingDistort = false;
+        applyingPlayerBloom = false;
     }
 }

@@ -10,6 +10,16 @@ blacktheo_madeline_level=玛德琳透镜强度
 blacktheo_madeline_speed_help=速度：透镜强度随玛德琳速度变化
 blacktheo_madeline_layer=玛德琳图层捕获（实验）
 blacktheo_madeline_layer_help=把玛德琳渲染到独立RT并生成精确像素遮罩
+blacktheo_hook_gameplay=GameplayRenderer 钩子
+blacktheo_hook_gameplay_help=启用 GameplayRenderer 的捕获/提取钩子
+blacktheo_hook_player=Player 遮罩钩子
+blacktheo_hook_player_help=启用 Player.Render 的遮罩捕获钩子
+blacktheo_hook_lighting=光照钩子
+blacktheo_hook_lighting_help=启用玛德琳图层的独立光照与 Distort
+blacktheo_hook_bloom=Bloom 钩子
+blacktheo_hook_bloom_help=启用玛德琳图层的 Bloom 处理与合成
+blacktheo_hook_glitch=Glitch / 黑洞钩子
+blacktheo_hook_glitch_help=启用 Glitch postfix 中的 Theo 黑洞绘制
 blacktheo_enabled=开关
 
 modoptions_blacktheo_lensstrength_off=关闭
