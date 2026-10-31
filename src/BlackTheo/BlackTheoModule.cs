@@ -52,6 +52,8 @@ public sealed class BlackTheoModule : EverestModule
         On.Celeste.Glitch.Apply += Glitch_Apply;
         On.Celeste.TheoCrystal.ctor_Vector2 += TheoCrystal_ctor;
         On.Celeste.GameplayRenderer.Render += GameplayRenderer_Render;
+        On.Celeste.LightingRenderer.Render += LightingRenderer_Render;
+        On.Celeste.Distort.Render += Distort_Render;
         On.Celeste.Player.Render += Player_Render;
         Logger.Log(LogLevel.Info, "BlackTheo", "Loaded. Theo is now a lensing black hole.");
     }
@@ -61,6 +63,8 @@ public sealed class BlackTheoModule : EverestModule
         On.Celeste.Glitch.Apply -= Glitch_Apply;
         On.Celeste.TheoCrystal.ctor_Vector2 -= TheoCrystal_ctor;
         On.Celeste.GameplayRenderer.Render -= GameplayRenderer_Render;
+        On.Celeste.LightingRenderer.Render -= LightingRenderer_Render;
+        On.Celeste.Distort.Render -= Distort_Render;
         On.Celeste.Player.Render -= Player_Render;
 
         // If this is a live unload, put the normal Theo visuals back.
@@ -113,6 +117,30 @@ public sealed class BlackTheoModule : EverestModule
         }
 
         orig(self);
+    }
+
+    private static void LightingRenderer_Render(
+        On.Celeste.LightingRenderer.orig_Render orig,
+        LightingRenderer self,
+        Scene scene)
+    {
+        orig(self, scene);
+        MadelineLayer.ApplyLighting(self);
+        MadelineLayer.ApplyDistort();
+    }
+
+    private static void Distort_Render(
+        On.Celeste.Distort.orig_Render orig,
+        Texture2D source,
+        Texture2D map,
+        bool hasDistortion)
+    {
+        orig(source, map, hasDistortion);
+
+        if (!MadelineLayer.IsApplyingDistort)
+        {
+            MadelineLayer.CompositeDistortedLayer();
+        }
     }
 
     private static void TheoCrystal_ctor(
