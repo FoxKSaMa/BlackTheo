@@ -18,8 +18,11 @@ internal static class MadelineLayer
     private static RenderTarget2D? layer;
     private static RenderTarget2D? mask;
     private static RenderTarget2D? litLayer;
+    private static RenderTarget2D? distortedLayer;
+    private static RenderTarget2D? distortMask;
     private static int captureDepth;
     private static bool hasMask;
+    private static bool applyingDistort;
 
     private static readonly BlendState PremultipliedOver = new()
     {
@@ -47,11 +50,18 @@ internal static class MadelineLayer
 
     public static RenderTarget2D? LitLayer => litLayer;
 
+    public static RenderTarget2D? DistortedLayer => distortedLayer;
+
+    public static RenderTarget2D? DistortMask => distortMask;
+
+    public static bool IsApplyingDistort => applyingDistort;
+
     public static bool IsCapturing => captureDepth > 0;
 
     public static void BeginFrame()
     {
         hasMask = false;
+        applyingDistort = false;
     }
 
     public static void BeginCapture()
@@ -202,10 +212,65 @@ internal static class MadelineLayer
         Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
-        // Lighting.Render ran against Gameplay; composite the independently
-        // lit Madeline layer back into Gameplay immediately, before Level.Render
-        // moves on to Level / Distort / Bloom.
+        // Leave Gameplay as the active target; the distorted Madeline will be
+        // composited into Level only after Level.Render's Distort.Render pass.
         device.SetRenderTarget(GameplayBuffers.Gameplay);
+    }
+
+    public static void ApplyDistort()
+    {
+        if (!hasMask || litLayer == null || litLayer.IsDisposed ||
+            distortedLayer == null || distortedLayer.IsDisposed ||
+            distortMask == null || distortMask.IsDisposed ||
+            GameplayBuffers.Displacement == null)
+        {
+            return;
+        }
+
+        Level? level = Engine.Scene as Level;
+        GraphicsDevice device = Engine.Instance.GraphicsDevice;
+
+        // Apply the same Distort shader to the isolated lit player layer.
+        device.SetRenderTarget(distortedLayer);
+        device.Clear(Color.Transparent);
+        applyingDistort = true;
+        try
+        {
+            Distort.Render(
+                litLayer,
+                GameplayBuffers.Displacement,
+                level != null && level.Displacement.HasDisplacement(level));
+        }
+        finally
+        {
+            applyingDistort = false;
+        }
+
+        // The distorted alpha is the new screen-space mask.
+        device.SetRenderTarget(distortMask);
+        device.Clear(Color.Transparent);
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            BlendState.Opaque,
+            SamplerState.PointClamp,
+            DepthStencilState.None,
+            RasterizerState.CullNone);
+        Draw.SpriteBatch.Draw(distortedLayer, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
+
+        device.SetRenderTarget(GameplayBuffers.Gameplay);
+    }
+
+    public static void CompositeDistortedLayer()
+    {
+        if (!hasMask || distortedLayer == null || distortedLayer.IsDisposed ||
+            GameplayBuffers.Level == null)
+        {
+            return;
+        }
+
+        GraphicsDevice device = Engine.Instance.GraphicsDevice;
+        device.SetRenderTarget(GameplayBuffers.Level);
         Draw.SpriteBatch.Begin(
             SpriteSortMode.Deferred,
             PremultipliedOver,
@@ -214,7 +279,7 @@ internal static class MadelineLayer
             RasterizerState.CullNone,
             effect: null,
             transformMatrix: Matrix.Identity);
-        Draw.SpriteBatch.Draw(litLayer, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.Draw(distortedLayer, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
     }
 
@@ -270,6 +335,36 @@ internal static class MadelineLayer
                 0,
                 RenderTargetUsage.PreserveContents);
         }
+
+        if (distortedLayer == null || distortedLayer.IsDisposed ||
+            distortedLayer.Width != gameplay.Width || distortedLayer.Height != gameplay.Height)
+        {
+            distortedLayer?.Dispose();
+            distortedLayer = new RenderTarget2D(
+                Engine.Instance.GraphicsDevice,
+                gameplay.Width,
+                gameplay.Height,
+                mipMap: false,
+                SurfaceFormat.Color,
+                DepthFormat.None,
+                0,
+                RenderTargetUsage.PreserveContents);
+        }
+
+        if (distortMask == null || distortMask.IsDisposed ||
+            distortMask.Width != gameplay.Width || distortMask.Height != gameplay.Height)
+        {
+            distortMask?.Dispose();
+            distortMask = new RenderTarget2D(
+                Engine.Instance.GraphicsDevice,
+                gameplay.Width,
+                gameplay.Height,
+                mipMap: false,
+                SurfaceFormat.Color,
+                DepthFormat.None,
+                0,
+                RenderTargetUsage.PreserveContents);
+        }
     }
 
     public static void Dispose()
@@ -280,7 +375,12 @@ internal static class MadelineLayer
         mask = null;
         litLayer?.Dispose();
         litLayer = null;
+        distortedLayer?.Dispose();
+        distortedLayer = null;
+        distortMask?.Dispose();
+        distortMask = null;
         captureDepth = 0;
         hasMask = false;
+        applyingDistort = false;
     }
 }
