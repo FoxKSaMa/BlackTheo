@@ -112,7 +112,8 @@ public sealed class BlackTheoModule : EverestModule
         Scene scene)
     {
         orig(self, scene);
-        MadelineLayer.CaptureLitLayer();
+        Logger.Log(LogLevel.Info, "BlackTheo", "LightingRenderer_Render postfix");
+        MadelineLayer.ApplyLighting(self);
     }
 
     private static void Player_Render(On.Celeste.Player.orig_Render orig, Player self)

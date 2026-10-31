@@ -9,8 +9,9 @@ namespace Celeste.Mod.BlackTheo;
 /// Experimental player-layer capture.
 ///
 /// While EntityList renders, Player.Render is redirected into a transparent
-/// layer target, copied into a mask target, and the layer is composited back
-/// into Gameplay at the same point in the entity order.
+/// layer target and copied into a mask target. The layer is intentionally not
+/// composited back there. After Lighting.Render, the same light map is applied
+/// to the isolated layer and the lit layer is composited into Gameplay.
 /// </summary>
 internal static class MadelineLayer
 {
@@ -126,22 +127,9 @@ internal static class MadelineLayer
         }
         finally
         {
-            // 3. Composite the captured layer back into Gameplay at the same
-            //    entity-order position. The layer contains premultiplied color
-            //    because it was rendered over a transparent target.
+            // The player is intentionally not composited back into Gameplay.
+            // Restore the normal entity-order batch so subsequent entities draw.
             device.SetRenderTarget(GameplayBuffers.Gameplay);
-            Draw.SpriteBatch.Begin(
-                SpriteSortMode.Deferred,
-                PremultipliedOver,
-                SamplerState.PointWrap,
-                DepthStencilState.None,
-                RasterizerState.CullNone,
-                effect: null,
-                transformMatrix: Matrix.Identity);
-            Draw.SpriteBatch.Draw(layer, Vector2.Zero, Color.White);
-            Draw.SpriteBatch.End();
-
-            // Resume the normal entity-order batch for subsequent entities.
             Draw.SpriteBatch.Begin(
                 SpriteSortMode.Deferred,
                 BlendState.AlphaBlend,
@@ -155,10 +143,12 @@ internal static class MadelineLayer
         return true;
     }
 
-    public static void CaptureLitLayer()
+    public static void ApplyLighting(LightingRenderer lighting)
     {
-        if (!hasMask || mask == null || mask.IsDisposed ||
-            GameplayBuffers.Gameplay == null)
+        if (!hasMask || layer == null || layer.IsDisposed ||
+            mask == null || mask.IsDisposed ||
+            GameplayBuffers.Light == null ||
+            GFX.FxDither == null)
         {
             return;
         }
@@ -171,7 +161,27 @@ internal static class MadelineLayer
 
         GraphicsDevice device = Engine.Instance.GraphicsDevice;
 
-        // 1. Copy the lit Gameplay target.
+        // Apply the same lighting pass to the isolated player layer.
+        device.SetRenderTarget(layer);
+        GFX.FxDither.CurrentTechnique = GFX.FxDither.Techniques["InvertDither"];
+        GFX.FxDither.Parameters["size"].SetValue(
+            new Vector2(GameplayBuffers.Light.Width, GameplayBuffers.Light.Height));
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            GFX.DestinationTransparencySubtract,
+            SamplerState.PointClamp,
+            DepthStencilState.None,
+            RasterizerState.CullNone,
+            GFX.FxDither,
+            Matrix.Identity);
+        Draw.SpriteBatch.Draw(
+            GameplayBuffers.Light,
+            Vector2.Zero,
+            Color.White * MathHelper.Clamp(lighting.Alpha, 0f, 1f));
+        Draw.SpriteBatch.End();
+
+        // Copy the lit layer and re-apply the mask so no lighting pixels
+        // outside Madeline survive.
         device.SetRenderTarget(litLayer);
         device.Clear(Color.Transparent);
         Draw.SpriteBatch.Begin(
@@ -180,10 +190,9 @@ internal static class MadelineLayer
             SamplerState.PointClamp,
             DepthStencilState.None,
             RasterizerState.CullNone);
-        Draw.SpriteBatch.Draw(GameplayBuffers.Gameplay, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.Draw(layer, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
-        // 2. Keep only pixels covered by the saved Madeline mask.
         Draw.SpriteBatch.Begin(
             SpriteSortMode.Deferred,
             MaskMultiply,
@@ -193,9 +202,20 @@ internal static class MadelineLayer
         Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
-        // Lighting.Render ran against Gameplay; restore that target so the
-        // following Level.Render stage behaves normally.
+        // Lighting.Render ran against Gameplay; composite the independently
+        // lit Madeline layer back into Gameplay immediately, before Level.Render
+        // moves on to Level / Distort / Bloom.
         device.SetRenderTarget(GameplayBuffers.Gameplay);
+        Draw.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            PremultipliedOver,
+            SamplerState.PointWrap,
+            DepthStencilState.None,
+            RasterizerState.CullNone,
+            effect: null,
+            transformMatrix: Matrix.Identity);
+        Draw.SpriteBatch.Draw(litLayer, Vector2.Zero, Color.White);
+        Draw.SpriteBatch.End();
     }
 
     private static void EnsureTargets()
@@ -218,7 +238,7 @@ internal static class MadelineLayer
                 SurfaceFormat.Color,
                 DepthFormat.None,
                 0,
-                RenderTargetUsage.DiscardContents);
+                RenderTargetUsage.PreserveContents);
         }
 
         if (mask == null || mask.IsDisposed ||
@@ -233,7 +253,7 @@ internal static class MadelineLayer
                 SurfaceFormat.Color,
                 DepthFormat.None,
                 0,
-                RenderTargetUsage.DiscardContents);
+                RenderTargetUsage.PreserveContents);
         }
 
         if (litLayer == null || litLayer.IsDisposed ||
@@ -248,7 +268,7 @@ internal static class MadelineLayer
                 SurfaceFormat.Color,
                 DepthFormat.None,
                 0,
-                RenderTargetUsage.DiscardContents);
+                RenderTargetUsage.PreserveContents);
         }
     }
 
