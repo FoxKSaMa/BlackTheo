@@ -130,6 +130,13 @@ RRGGBBAA
 
 ## 构建
 
+项目使用模板配置：
+
+- `src/BlackTheo/CelesteMod.props`
+- `src/BlackTheo/CelesteMod.targets`
+- `CelesteRootPath` 指向 Celeste 安装目录
+- Code 输出直接进入 `dist/BlackTheo/Code`
+
 需要：
 
 - Windows x64
@@ -137,25 +144,46 @@ RRGGBBAA
 - Celeste + Everest 的 DLL
 - 本机有 `d3dx9_43.dll`（Windows 自带）
 
-设置 Celeste 路径：
+最方便的是直接用：
+
+```text
+build.bat                  生成 dist 包
+build.bat deploy           生成并部署
+build.bat hotreload        只替换 DLL，按 F5 热重载
+```
+
+也可以手动设置：
 
 ```powershell
 $env:CELESTE_DIR = 'C:\Program Files (x86)\Steam\steamapps\common\Celeste'
 powershell -ExecutionPolicy Bypass -File .\build.ps1 -Deploy
 ```
 
-也可以显式传入：
+或：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build.ps1 `
   -CelestePath 'C:\Program Files (x86)\Steam\steamapps\common\Celeste' -Deploy
 ```
 
-脚本会自动尝试常见的 Steam 安装位置。构建结果在：
+构建结果在：
 
 ```text
 dist/BlackTheo
 ```
+
+发布包结构是：
+
+```text
+dist/BlackTheo/
+├─ everest.yaml
+├─ Code/
+│  ├─ BlackTheo.dll
+│  └─ BlackTheo.pdb
+└─ Dialog/
+```
+
+`build.bat hotreload` 只复制 DLL，不复制资源。修改 C# 后按 F5 重载关卡即可。
 
 运行时不读取 `Effects/`；shader 已经以 `Resources/BlackHole.cso` 的形式嵌入 DLL，因此发布包里不需要 `Effects` 文件夹。
 
@@ -171,11 +199,16 @@ BlackTheo/
 │     ├─ BlackHoleComponent.cs        # 每个 Theo 的组件
 │     ├─ BlackHoleRenderer.cs         # RT、Theo/玛德琳跟踪、参数
 │     ├─ BlackTheoModule.cs           # Everest Hook
+│     ├─ LycarionLogger.cs            # 调试日志/WebSocket 服务
+│     ├─ MadelineLayer.cs             # 玛德琳分层捕获实验
 │     ├─ HexColor.cs                  # HEX → RGBA
+│     ├─ CelesteMod.props             # 模板引用配置
+│     ├─ CelesteMod.targets           # 模板构建/输出配置
 │     ├─ Dialog/                      # 中英文选项文本
 │     └─ Resources/BlackHole.cso      # 嵌入资源
 ├─ tools/EffectCompiler/              # 不依赖 Windows SDK 的 fxc 替代
 ├─ docs/                              # 实现原理文档和示意图
+├─ build.bat
 ├─ build.ps1
 ├─ LICENSE
 └─ README.md

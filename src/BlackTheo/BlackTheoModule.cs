@@ -1,8 +1,10 @@
-using System;
 using Celeste.Mod;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Monocle;
+using MonoMod.RuntimeDetour;
+using System;
+using Utils;
 
 namespace Celeste.Mod.BlackTheo;
 
@@ -17,6 +19,23 @@ public sealed class BlackTheoModule : EverestModule
     public static BlackTheoSettings Settings =>
         Instance?._Settings as BlackTheoSettings ?? DefaultSettings;
 
+    private Hook? LogHook;
+    private static void Logger_Log_Hook(Action<LogLevel, string, string> orig, LogLevel level, string tag, string message)
+    {
+        var lvl = level switch
+        {
+            LogLevel.Debug => LycarionLogLevel.Debug,
+            LogLevel.Info => LycarionLogLevel.Info,
+            LogLevel.Warn => LycarionLogLevel.Warn,
+            LogLevel.Error => LycarionLogLevel.Error,
+            _ => LycarionLogLevel.Info
+        };
+        if (tag == "BlackTheo")
+            LycarionLogger.Log(lvl, tag, message);
+
+        orig(level, tag, message);
+    }
+
     public BlackTheoModule()
     {
         Instance = this;
@@ -24,6 +43,12 @@ public sealed class BlackTheoModule : EverestModule
 
     public override void Load()
     {
+        LycarionLogger.Initialize(8087);
+        LogHook = new Hook(
+            typeof(Logger).GetMethod("Log", [typeof(LogLevel), typeof(string), typeof(string)])!,
+            Logger_Log_Hook
+        );
+
         On.Celeste.Glitch.Apply += Glitch_Apply;
         On.Celeste.TheoCrystal.ctor_Vector2 += TheoCrystal_ctor;
         On.Celeste.GameplayRenderer.Render += GameplayRenderer_Render;
@@ -50,6 +75,9 @@ public sealed class BlackTheoModule : EverestModule
         MadelineLayer.Dispose();
         BlackHoleRenderer.Dispose();
         Logger.Log(LogLevel.Info, "BlackTheo", "Unloaded.");
+
+        LogHook?.Dispose();
+        LycarionLogger.Shutdown();
     }
 
     private static void GameplayRenderer_Render(

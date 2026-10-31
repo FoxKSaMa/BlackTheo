@@ -1,18 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="CelesteMod.props" />
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
+    <CelesteRootPath Condition="'$(CelesteRootPath)' == ''">$(CELESTE_ROOT)</CelesteRootPath>
+    <CelesteRootPath Condition="'$(CelesteRootPath)' == ''">$(CELESTE_DIR)</CelesteRootPath>
+    <CelesteRootPath Condition="'$(CelesteRootPath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Celeste</CelesteRootPath>
     <AssemblyName>BlackTheo</AssemblyName>
     <RootNamespace>Celeste.Mod.BlackTheo</RootNamespace>
-    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <DebugType>portable</DebugType>
     <Deterministic>true</Deterministic>
-    <CelesteDir Condition="'$(CelesteDir)' == ''">$(CELESTE_DIR)</CelesteDir>
-    <CelesteDir Condition="'$(CelesteDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Celeste</CelesteDir>
+    <ModAssetsFolderName>..\..\dist\BlackTheo</ModAssetsFolderName>
+    <ModAssetsCopyType>none</ModAssetsCopyType>
+    <UseCelesteAnalyzer>true</UseCelesteAnalyzer>
+    <UseCelestePublicizer>true</UseCelestePublicizer>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,25 +26,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="Celeste">
-      <HintPath>$(CelesteDir)\Celeste.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="FNA">
-      <HintPath>$(CelesteDir)\FNA.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="MMHOOK_Celeste">
-      <HintPath>$(CelesteDir)\MMHOOK_Celeste.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="MonoMod.Utils">
-      <HintPath>$(CelesteDir)\MonoMod.Utils.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Mono.Cecil">
-      <HintPath>$(CelesteDir)\Mono.Cecil.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <None Include="CelesteMod.props">
+      <Visible>false</Visible>
+    </None>
+    <None Include="CelesteMod.targets">
+      <Visible>false</Visible>
+    </None>
   </ItemGroup>
+
+  <Import Project="CelesteMod.targets" />
 </Project>

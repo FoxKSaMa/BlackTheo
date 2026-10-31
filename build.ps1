@@ -1,5 +1,6 @@
 param(
     [switch]$Deploy,
+    [switch]$HotReload,
     [string]$CelestePath = $env:CELESTE_DIR
 )
 
@@ -36,13 +37,25 @@ New-Item -ItemType Directory -Force $DialogDst | Out-Null
 Copy-Item (Join-Path $Root 'src\BlackTheo\Dialog\*') $DialogDst -Force
 
 Write-Host 'Building mod...'
-dotnet build (Join-Path $Root 'src\BlackTheo\BlackTheo.csproj') -c Release -p:CelesteDir="$CelestePath"
+dotnet build (Join-Path $Root 'src\BlackTheo\BlackTheo.csproj') -c Release -p:CelesteRootPath="$CelestePath"
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 
 $Out = Join-Path $Root 'src\BlackTheo\bin\Release\net8.0'
-New-Item -ItemType Directory -Force (Join-Path $Dist 'Code\bin') | Out-Null
-Copy-Item (Join-Path $Out 'BlackTheo.dll') (Join-Path $Dist 'Code\bin\BlackTheo.dll') -Force
-Copy-Item (Join-Path $Out 'BlackTheo.pdb') (Join-Path $Dist 'Code\bin\BlackTheo.pdb') -Force
+
+if ($HotReload) {
+    $HotTargets = @(
+        (Join-Path $CelestePath 'Mods\BlackTheo\Code\bin'),
+        (Join-Path $CelestePath 'Mods\BlackTheo\Code')
+    )
+    foreach ($HotTarget in $HotTargets) {
+        New-Item -ItemType Directory -Force $HotTarget | Out-Null
+        Copy-Item (Join-Path $Out 'BlackTheo.dll') (Join-Path $HotTarget 'BlackTheo.dll') -Force
+    }
+    Write-Host 'Hot reload DLL copied. Press F5 in Celeste to reload the level.'
+    exit 0
+}
+
+Remove-Item (Join-Path $Dist 'Code\bin') -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host "Packaged mod at $Dist"
 
