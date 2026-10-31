@@ -137,7 +137,12 @@ internal static class BlackHoleRenderer
 
         if (madelineLens != null)
         {
-            ApplyMadelineLens(device, sourceTarget, madelineLens.Value, time);
+            ApplyMadelineLens(
+                device,
+                sourceTarget,
+                madelineLens.Value,
+                time,
+                !settings.HideMadelineLensCore);
         }
     }
 
@@ -170,6 +175,7 @@ internal static class BlackHoleRenderer
         effect.Parameters["LensFalloff"].SetValue(lens.Falloff);
         effect.Parameters["LensEdge"].SetValue(lens.EdgeStart);
         effect.Parameters["LensOnly"].SetValue(0f);
+        effect.Parameters["DrawLensCore"].SetValue(1f);
         effect.Parameters["MadelineMask"].SetValue(madelineMask);
         effect.Parameters["ProtectMadeline"].SetValue(madelineMask.Z > 0f ? 1f : 0f);
         effect.Parameters["DopplerEnabled"].SetValue(hole.Doppler ? 1f : 0f);
@@ -397,7 +403,8 @@ internal static class BlackHoleRenderer
         GraphicsDevice device,
         RenderTarget2D sourceTarget,
         MadelineLens lens,
-        float time)
+        float time,
+        bool drawCore)
     {
         device.SetRenderTarget(capture);
         device.Clear(Color.Black);
@@ -414,6 +421,7 @@ internal static class BlackHoleRenderer
         effect.Parameters["HoleParams"].SetValue(
             new Vector4(1f, lens.Strength, lens.CoreRadius, time));
         effect.Parameters["LensOnly"].SetValue(1f);
+        effect.Parameters["DrawLensCore"].SetValue(drawCore ? 1f : 0f);
         effect.Parameters["ProtectMadeline"].SetValue(0f);
         effect.Parameters["DopplerEnabled"].SetValue(0f);
         effect.Parameters["SpecksEnabled"].SetValue(0f);

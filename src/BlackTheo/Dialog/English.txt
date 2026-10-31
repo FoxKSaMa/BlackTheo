@@ -8,6 +8,8 @@ blacktheo_specks=Stardust
 blacktheo_madeline_lens=Madeline black hole mode
 blacktheo_madeline_level=Madeline lens strength
 blacktheo_madeline_speed_help=Speed: lens strength follows Madeline's speed.
+blacktheo_hide_madeline_core=Hide Madeline lens core
+blacktheo_hide_madeline_core_help=Do not draw the black core at the center of Madeline's lens.
 blacktheo_enabled=Toggle
 
 modoptions_blacktheo_lensstrength_off=Off
