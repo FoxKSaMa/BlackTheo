@@ -69,7 +69,7 @@ public sealed class BlackTheoModule : EverestModule
         On.Celeste.BloomRenderer.Apply -= BloomRenderer_Apply;
         On.Celeste.Player.Render -= Player_Render;
 
-        // If this is a live unload, put the normal Theo visuals back.
+        // 如果是运行时卸载，把 Theo 的原始视觉恢复。
         if (Engine.Scene is Level level)
         {
             foreach (TheoCrystal theo in level.Tracker.GetEntities<TheoCrystal>())
@@ -212,9 +212,8 @@ public sealed class BlackTheoModule : EverestModule
     {
         orig(self, position);
 
-        // The component owns the original sprite/light and the per-Theo
-        // overrides. It is also what restores the crystal if the effect is
-        // disabled or fails to load.
+        // 组件持有原始精灵/光源和每个 Theo 的覆盖参数；
+        // 禁用效果或加载失败时，也由它恢复水晶外观。
         if (self.Get<BlackHoleComponent>() == null)
         {
             self.Add(new BlackHoleComponent());
@@ -228,11 +227,9 @@ public sealed class BlackTheoModule : EverestModule
         float seed,
         float amplitude)
     {
-        // Glitch.Apply is the last world-space full-screen pass in Level.Render:
-        // background, gameplay, lighting, foreground and glitch have all been
-        // composited into GameplayBuffers.Level by this point, but the HUD has
-        // not. Post-processing here therefore warps the screen behind Theo
-        // without warping the HUD.
+        // Glitch.Apply 是 Level.Render 中最后一个世界空间全屏 pass：
+        // 此时背景、Gameplay、光照、Foreground 和 Glitch 都已合成到 Level，
+        // 但 HUD 还没有。这里的后处理只会扭曲 Theo 背后的画面，不会扭曲 HUD。
         orig(source, timer, seed, amplitude);
 
         if (!BlackTheoModule.Settings.HookGlitch)

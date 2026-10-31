@@ -5,11 +5,11 @@ using Monocle;
 namespace Celeste.Mod.BlackTheo;
 
 /// <summary>
-/// Experimental Madeline extraction.
+/// 实验性玛德琳提取。
 ///
-/// Player.Render draws normally into Gameplay, but first writes a silhouette
-/// into a mask RT. After GameplayRenderer.Render, the masked pixels are copied
-/// out of Gameplay into PlayerLayer and then removed from Gameplay.
+/// Player.Render 先写入仅含 alpha 剪影的 mask，再正常画进 Gameplay；
+/// 随后立刻把玩家像素提取到 PlayerLayer，并从 Gameplay 中清除。
+/// GameplayRenderer 结束时再裁剪与玩家重叠的低深度像素。
 /// </summary>
 internal static class MadelineLayer
 {
@@ -42,8 +42,8 @@ internal static class MadelineLayer
         AlphaBlendFunction = BlendFunction.Add
     };
 
-    // Keep destination alpha where the mask is zero, and clear it where the
-    // mask is one. This is the inverse of MaskMultiply.
+    // mask 为 0 时保留目标 alpha，为 1 时清除目标；
+    // 这是 MaskMultiply 的逆操作。
     private static readonly BlendState MaskMultiply = new()
     {
         ColorSourceBlend = Blend.Zero,
@@ -105,8 +105,8 @@ internal static class MadelineLayer
     }
 
     /// <summary>
-    /// Called before the normal Player.Render. It only captures the alpha
-    /// silhouette; the actual player is still rendered by orig(self).
+    /// 在正常的 Player.Render 之前调用，只捕获 alpha 剪影；
+    /// 实际玩家仍由 orig(self) 渲染。
     /// </summary>
     public static void CaptureMask(Player player)
     {
@@ -127,7 +127,7 @@ internal static class MadelineLayer
 
         GraphicsDevice device = Engine.Instance.GraphicsDevice;
 
-        // Flush everything drawn before Madeline in the current entity order.
+        // 刷新当前实体顺序中、玛德琳之前已经绘制的内容。
         Draw.SpriteBatch.End();
 
         try
@@ -154,8 +154,7 @@ internal static class MadelineLayer
         }
         finally
         {
-            // Resume the normal entity-order batch. orig(self) draws the
-            // visible player into Gameplay immediately after this method.
+            // 恢复正常的实体批次；orig(self) 会紧接着把可见玩家画进 Gameplay。
             device.SetRenderTarget(GameplayBuffers.Gameplay);
             Draw.SpriteBatch.Begin(
                 SpriteSortMode.Deferred,
@@ -171,8 +170,8 @@ internal static class MadelineLayer
     }
 
     /// <summary>
-    /// Runs after GameplayRenderer.Render. Copies the masked player pixels to
-    /// PlayerLayer, then clears those pixels from Gameplay.
+    /// 在 Player.Render 之后执行：把带 mask 的玩家像素复制到 PlayerLayer，
+    /// 再从 Gameplay 中清除。
     /// </summary>
     public static void CaptureOcclusionBeforeEntity()
     {
@@ -237,11 +236,10 @@ internal static class MadelineLayer
 
         GraphicsDevice device = Engine.Instance.GraphicsDevice;
 
-        // Player.Render left the entity SpriteBatch active; close it before
-        // switching render targets for the extraction passes.
+        // Player.Render 留下了实体 SpriteBatch；切换 RenderTarget 前先结束它。
         Draw.SpriteBatch.End();
 
-        // 1. Copy Gameplay, then keep only the masked player pixels.
+        // 1. 复制 Gameplay，只保留 mask 覆盖的玩家像素。
         device.SetRenderTarget(playerLayer);
         device.Clear(Color.Transparent);
         Draw.SpriteBatch.Begin(
@@ -262,8 +260,8 @@ internal static class MadelineLayer
         Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
-        // 2. Remove those pixels from Gameplay so the player exists only in
-        //    the separate layer until it is composited again.
+        // 2. 从 Gameplay 中移除这些像素，玩家只存在于独立图层，
+        //    等待后续重新合成。
         device.SetRenderTarget(GameplayBuffers.Gameplay);
         Draw.SpriteBatch.Begin(
             SpriteSortMode.Deferred,
@@ -274,9 +272,8 @@ internal static class MadelineLayer
         Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
-        // Build the masked pre-player snapshot. It is not drawn back yet;
-        // ClipPlayerLayerAgainstFront restores it only where no lower-depth
-        // entity was drawn afterwards.
+        // 生成玩家渲染前的 masked 快照，但暂不画回；
+        // ClipPlayerLayerAgainstFront 只会在没有更低深度实体的地方恢复它。
         if (occlusionCaptured && occlusionRT != null && !occlusionRT.IsDisposed &&
             backdropLayer != null && !backdropLayer.IsDisposed)
         {
@@ -304,7 +301,7 @@ internal static class MadelineLayer
             hasBackdropLayer = true;
         }
 
-        // Resume the entity batch for the remaining entities.
+        // 恢复实体批次，让后续实体继续渲染。
         Level? level = Engine.Scene as Level;
         device.SetRenderTarget(GameplayBuffers.Gameplay);
         Draw.SpriteBatch.Begin(
@@ -329,9 +326,8 @@ internal static class MadelineLayer
 
         GraphicsDevice device = Engine.Instance.GraphicsDevice;
 
-        // Gameplay currently contains only the entities rendered after the
-        // player inside the player silhouette, because the player was cleared
-        // and no backdrop was restored. Copy that alpha as the front mask.
+        // 此时 Gameplay 中只剩下玩家剪影内、玩家之后渲染的实体，
+        // 因为玩家已被清除且没有恢复背景。把这份 alpha 复制为 front mask。
         device.SetRenderTarget(frontMask);
         device.Clear(Color.Transparent);
         Draw.SpriteBatch.Begin(
@@ -352,7 +348,7 @@ internal static class MadelineLayer
         Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
-        // Clip only the separated player RT; Gameplay is not modified here.
+        // 只裁剪分离出的玩家 RT，不修改 Gameplay。
         device.SetRenderTarget(playerLayer);
         Draw.SpriteBatch.Begin(
             SpriteSortMode.Deferred,
@@ -363,9 +359,8 @@ internal static class MadelineLayer
         Draw.SpriteBatch.Draw(frontMask, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
-        // Restore the masked pre-player background only where no lower-depth
-        // entity is present. This fills the transparent hole without
-        // overwriting entities that were drawn after the player.
+        // 只恢复没有被更低深度实体覆盖的、玩家之前的背景。
+        // 这样补上透明洞，又不会覆盖玩家之后绘制的实体。
         if (hasBackdropLayer && backdropLayer != null && !backdropLayer.IsDisposed &&
             restoreLayer != null && !restoreLayer.IsDisposed)
         {
@@ -418,7 +413,7 @@ internal static class MadelineLayer
 
         GraphicsDevice device = Engine.Instance.GraphicsDevice;
 
-        // Apply the same lighting pass to the extracted player.
+        // 对提取出的玩家应用同一份光照。
         device.SetRenderTarget(playerLayer);
         GFX.FxDither.CurrentTechnique = GFX.FxDither.Techniques["InvertDither"];
         GFX.FxDither.Parameters["size"].SetValue(
@@ -437,7 +432,7 @@ internal static class MadelineLayer
             Color.White * MathHelper.Clamp(lighting.Alpha, 0f, 1f));
         Draw.SpriteBatch.End();
 
-        // Copy the lit player and re-apply the mask.
+        // 复制打光后的玩家，并重新应用 mask。
         device.SetRenderTarget(litLayer);
         device.Clear(Color.Transparent);
         Draw.SpriteBatch.Begin(
@@ -458,8 +453,7 @@ internal static class MadelineLayer
         Draw.SpriteBatch.Draw(mask, Vector2.Zero, Color.White);
         Draw.SpriteBatch.End();
 
-        // Do not composite back here. The actual Distort.Render will be the
-        // insertion point for the distorted player.
+        // 这里不合成；真正的 Distort.Render 才是插入点。
         hasLit = true;
         device.SetRenderTarget(GameplayBuffers.Gameplay);
     }
@@ -492,7 +486,7 @@ internal static class MadelineLayer
             applyingDistort = false;
         }
 
-        // The distorted alpha becomes the new screen-space mask.
+        // Distort 后的 alpha 作为新的屏幕空间 mask。
         device.SetRenderTarget(distortMask);
         device.Clear(Color.Transparent);
         Draw.SpriteBatch.Begin(
@@ -555,8 +549,8 @@ internal static class MadelineLayer
 
         GraphicsDevice device = Engine.Instance.GraphicsDevice;
 
-        // Copy the distorted player into a VirtualRenderTarget so that the
-        // original BloomRenderer.Apply can process it directly.
+        // 把 Distort 后的玩家复制到 VirtualRenderTarget，
+        // 交给原版 BloomRenderer.Apply 直接处理。
         device.SetRenderTarget(playerBloom.Target);
         device.Clear(Color.Transparent);
         Draw.SpriteBatch.Begin(
@@ -578,8 +572,7 @@ internal static class MadelineLayer
             applyingPlayerBloom = false;
         }
 
-        // Bloom keeps the destination alpha, but re-apply the mask so only
-        // player pixels remain in the final player bloom layer.
+        // Bloom 保留目标 alpha；再应用一次 mask，只留下玩家像素。
         device.SetRenderTarget(playerBloom.Target);
         Draw.SpriteBatch.Begin(
             SpriteSortMode.Deferred,

@@ -3,14 +3,14 @@
   <Target Name="PostModBuild" AfterTargets="AfterBuild">
     <Error Condition="'$(ModAssetsFolderName)' == ''" Text="ModAssetsFolderName is not set." Code="SMT04"/>
 
-    <!--copy compile output files-->
+    <!--复制编译输出文件-->
     <ItemGroup>
       <_CompileOutput Include="$(OutputPath)/**"/>
     </ItemGroup>
     <Copy SourceFiles="@(_CompileOutput)" DestinationFolder="$(ModAssetsFolderName)/Code/%(RecursiveDir)" SkipUnchangedFiles="true"/>
 
-    <!-- Hot reload convenience: write the new DLL directly into the
-         installed mod's Code folder. The running game can reload it with F5. -->
+    <!-- 热重载便利：把新 DLL 直接写入已安装 Mod 的 Code 文件夹，
+         运行时可按 F5 重载。 -->
     <Copy SourceFiles="@(_CompileOutput)"
           DestinationFolder="$(CelesteRootPath)/Mods/$(AssemblyName)/Code/%(RecursiveDir)"
           SkipUnchangedFiles="true"/>
@@ -25,10 +25,10 @@
       <_ModLinkNotExists>true</_ModLinkNotExists>
     </PropertyGroup>
     <Message Condition="'$(_ModLinkNotExists)' == 'true'" Text="Symbolic link not created, creating..."/>
-    <!--create symbolic link on windows-->
+    <!--在 Windows 上创建符号链接-->
     <Exec Condition="'$(_ModLinkNotExists)' == 'true' And '$(OS)' == 'Windows_NT'"
         Command="mklink /d &quot;$(CelesteRootPath)/Mods/$(AssemblyName)_link&quot; &quot;$(MSBuildProjectDirectory)/$(ModAssetsFolderName)&quot;"/>
-    <!--create symbolic link on unix-->
+    <!--在 Unix 上创建符号链接-->
     <Exec Condition="'$(_ModLinkNotExists)' == 'true' And '$(OS)' == 'Unix'"
         Command="ln -s &quot;$(MSBuildProjectDirectory)/$(ModAssetsFolderName)&quot; &quot;$(CelesteRootPath)/Mods/$(AssemblyName)_link&quot;"/>
   </Target>
