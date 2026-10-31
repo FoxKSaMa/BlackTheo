@@ -186,6 +186,11 @@ public sealed class BlackTheoModule : EverestModule
             return;
         }
 
+        if (!BlackTheoModule.Settings.HookComposite)
+        {
+            return;
+        }
+
         if (BlackTheoModule.Settings.HookBloom)
         {
             MadelineLayer.ApplyBloomToPlayer(self, scene);

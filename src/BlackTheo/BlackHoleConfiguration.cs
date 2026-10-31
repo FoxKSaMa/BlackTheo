@@ -289,6 +289,10 @@ public sealed class BlackTheoSettings : EverestModuleSettings
     [SettingSubText("blacktheo_hook_bloom_help")]
     public bool HookBloom { get; set; } = true;
 
+    [SettingName("blacktheo_hook_composite")]
+    [SettingSubText("blacktheo_hook_composite_help")]
+    public bool HookComposite { get; set; } = true;
+
     [SettingName("blacktheo_hook_glitch")]
     [SettingSubText("blacktheo_hook_glitch_help")]
     public bool HookGlitch { get; set; } = true;
